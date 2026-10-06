@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: native-${{ github.sha }}
+  cancel-in-progress: true
+
 env:
   OPTIONS: -DBOX3D_SAMPLES=OFF -DBOX3D_BENCHMARKS=OFF -DBOX3D_DOCS=OFF -DBOX3D_PROFILE=OFF
 
