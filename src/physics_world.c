@@ -152,18 +152,6 @@ static void b3DefaultFinishTaskFcn( void* userTask, void* userContext )
 	B3_UNUSED( userContext );
 }
 
-static float b3DefaultFrictionCallback( float frictionA, uint64_t materialA, float frictionB, uint64_t materialB )
-{
-	B3_UNUSED( materialA, materialB );
-	return sqrtf( frictionA * frictionB );
-}
-
-static float b3DefaultRestitutionCallback( float restitutionA, uint64_t materialA, float restitutionB, uint64_t materialB )
-{
-	B3_UNUSED( materialA, materialB );
-	return b3MaxFloat( restitutionA, restitutionB );
-}
-
 static void b3CreateWorkerContexts( b3World* world )
 {
 	b3Array_Resize( world->taskContexts, world->workerCount );
@@ -337,23 +325,10 @@ b3WorldId b3CreateWorld( const b3WorldDef* def )
 	world->contactDampingRatio = def->contactDampingRatio;
 	world->contactRecycleDistance = B3_CONTACT_RECYCLE_DISTANCE;
 
-	if ( def->frictionCallback == NULL )
-	{
-		world->frictionCallback = b3DefaultFrictionCallback;
-	}
-	else
-	{
-		world->frictionCallback = def->frictionCallback;
-	}
-
-	if ( def->restitutionCallback == NULL )
-	{
-		world->restitutionCallback = b3DefaultRestitutionCallback;
-	}
-	else
-	{
-		world->restitutionCallback = def->restitutionCallback;
-	}
+	B3_ASSERT( (unsigned)def->frictionMixingRule < (unsigned)b3_mixingRuleCount );
+	B3_ASSERT( (unsigned)def->restitutionMixingRule < (unsigned)b3_mixingRuleCount );
+	world->frictionMixingRule = def->frictionMixingRule;
+	world->restitutionMixingRule = def->restitutionMixingRule;
 
 	world->enableSleep = def->enableSleep;
 	world->locked = false;
@@ -2245,28 +2220,6 @@ void* b3World_GetUserData( b3WorldId worldId )
 {
 	b3World* world = b3GetWorldFromId( worldId );
 	return world->userData;
-}
-
-void b3World_SetFrictionCallback( b3WorldId worldId, b3FrictionCallback* callback )
-{
-	b3World* world = b3GetUnlockedWorldFromId( worldId );
-	if ( world == NULL )
-	{
-		return;
-	}
-
-	world->frictionCallback = callback != NULL ? callback : b3DefaultFrictionCallback;
-}
-
-void b3World_SetRestitutionCallback( b3WorldId worldId, b3RestitutionCallback* callback )
-{
-	b3World* world = b3GetUnlockedWorldFromId( worldId );
-	if ( world == NULL )
-	{
-		return;
-	}
-
-	world->restitutionCallback = callback != NULL ? callback : b3DefaultRestitutionCallback;
 }
 
 void b3World_SetWorkerCount( b3WorldId worldId, int count )

@@ -243,8 +243,8 @@ typedef struct b3World
 	float contactDampingRatio;
 	float contactRecycleDistance;
 
-	b3FrictionCallback* frictionCallback;
-	b3RestitutionCallback* restitutionCallback;
+	b3MixingRule frictionMixingRule;
+	b3MixingRule restitutionMixingRule;
 
 	uint16_t generation;
 
@@ -358,5 +358,22 @@ static inline void b3FreeManifolds( b3World* world, b3Manifold* manifolds, int c
 	b3BlockAllocator* allocator = b3Array_Get( world->manifoldAllocators, index );
 	b3FreeElement( allocator, manifolds );
 	b3UnlockMutex( world->manifoldAllocatorMutex );
+}
+
+static inline float b3MixMaterialValue( b3MixingRule rule, float a, float b )
+{
+	switch ( rule )
+	{
+		case b3_mixAverage:
+			return 0.5f * ( a + b );
+		case b3_mixMinimum:
+			return b3MinFloat( a, b );
+		case b3_mixMaximum:
+			return b3MaxFloat( a, b );
+		case b3_mixMultiply:
+			return a * b;
+		default:
+			return sqrtf( a * b );
+	}
 }
 

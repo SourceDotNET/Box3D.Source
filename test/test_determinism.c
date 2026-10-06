@@ -29,6 +29,7 @@
 #define QUERY_SPAWN_QUERY_HASH 0x5B4429DC
 #define MESH_DROP_SLEEP_STEP 218
 #define MESH_DROP_HASH 0x26F9A566
+#define MIXING_RULE_HASHES { 0x12245174, 0x384E0B23, 0xDB98A06A, 0x6038B0F3, 0xBBC19655 }
 #else
 #define RAGDOLL_SLEEP_STEP 267
 #define RAGDOLL_HASH 0x9BCA269D
@@ -40,7 +41,10 @@
 #define QUERY_SPAWN_QUERY_HASH 0xE3271F3D
 #define MESH_DROP_SLEEP_STEP 218
 #define MESH_DROP_HASH 0x0A23CFA2
+#define MIXING_RULE_HASHES { 0x3ECC3914, 0x00AF06B6, 0x4709587F, 0x5D50C55A, 0xF9D0FF2A }
 #endif
+
+#define MIXING_RULE_STEP_COUNT 150
 
 // The goldens above pin exact values for the default four point manifold. A build that
 // overrides B3_MAX_MANIFOLD_POINTS produces a different contact set, so those checks drop
@@ -548,6 +552,143 @@ static int SingleMeshMixTest( int workerCount, DeterminismResult* reference )
 	return 0;
 }
 
+static uint32_t RunMixingRuleScene( int workerCount, b3MixingRule rule )
+{
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	worldDef.workerCount = workerCount;
+	worldDef.frictionMixingRule = rule;
+	worldDef.restitutionMixingRule = rule;
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+
+	b3SurfaceMaterial groundMaterials[4];
+	for ( int i = 0; i < 4; ++i )
+	{
+		groundMaterials[i] = b3DefaultSurfaceMaterial();
+		groundMaterials[i].friction = 0.1f + 0.25f * (float)i;
+		groundMaterials[i].restitution = 0.2f * (float)i;
+	}
+
+	b3MeshData* mesh = b3CreateGridMesh( 16, 16, 1.0f, 4, true );
+	b3BodyDef groundDef = b3DefaultBodyDef();
+	b3BodyId groundId = b3CreateBody( worldId, &groundDef );
+	b3ShapeDef groundShapeDef = b3DefaultShapeDef();
+	groundShapeDef.materials = groundMaterials;
+	groundShapeDef.materialCount = 4;
+	b3CreateMeshShape( groundId, &groundShapeDef, mesh, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
+
+	enum
+	{
+		layerCount = 2,
+		rowCount = 5,
+		columnCount = 5,
+		bodyCount = layerCount * rowCount * columnCount
+	};
+
+	b3BodyId bodyIds[bodyCount];
+	b3BoxHull box = b3MakeBoxHull( 0.4f, 0.4f, 0.4f );
+	b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.4f };
+	b3Capsule capsule = { { -0.3f, 0.0f, 0.0f }, { 0.3f, 0.0f, 0.0f }, 0.25f };
+
+	uint32_t seed = 314159u;
+	for ( int i = 0; i < bodyCount; ++i )
+	{
+		int layer = i / ( rowCount * columnCount );
+		int row = ( i / columnCount ) % rowCount;
+		int column = i % columnCount;
+
+		b3BodyDef bodyDef = b3DefaultBodyDef();
+		bodyDef.type = b3_dynamicBody;
+		bodyDef.position = (b3Pos){ 2.0f * (float)column - 4.0f + 0.3f * (float)layer, 1.0f + 1.5f * (float)layer,
+									2.0f * (float)row - 4.0f + 0.3f * (float)layer };
+		bodyIds[i] = b3CreateBody( worldId, &bodyDef );
+
+		b3ShapeDef shapeDef = b3DefaultShapeDef();
+		shapeDef.density = 1.0f;
+		seed = seed * 1664525u + 1013904223u;
+		shapeDef.baseMaterial.friction = 0.05f + (float)( seed >> 24 ) / 255.0f;
+		seed = seed * 1664525u + 1013904223u;
+		shapeDef.baseMaterial.restitution = 0.9f * (float)( seed >> 24 ) / 255.0f;
+
+		switch ( i % 3 )
+		{
+			case 0:
+				b3CreateSphereShape( bodyIds[i], &shapeDef, &sphere );
+				break;
+			case 1:
+				b3CreateCapsuleShape( bodyIds[i], &shapeDef, &capsule );
+				break;
+			default:
+				b3CreateHullShape( bodyIds[i], &shapeDef, &box.base );
+				break;
+		}
+
+		float sign = ( i & 1 ) ? -1.0f : 1.0f;
+		b3Body_SetLinearVelocity( bodyIds[i], (b3Vec3){ sign * 1.5f, -2.0f, -sign * 1.0f } );
+	}
+
+	uint32_t hash = B3_HASH_INIT;
+	for ( int step = 0; step < MIXING_RULE_STEP_COUNT; ++step )
+	{
+		b3World_Step( worldId, 1.0f / 60.0f, 4 );
+		TracyCFrameMark;
+
+		for ( int i = 0; i < bodyCount; ++i )
+		{
+			b3WorldTransform xf = b3Body_GetTransform( bodyIds[i] );
+			hash = b3Hash( hash, (const uint8_t*)&xf, sizeof( b3WorldTransform ) );
+		}
+	}
+
+	b3DestroyWorld( worldId );
+	b3DestroyMesh( mesh );
+
+	return hash;
+}
+
+static int SingleMixingRuleTest( int workerCount, DeterminismResult* reference )
+{
+	const uint32_t goldens[b3_mixingRuleCount] = MIXING_RULE_HASHES;
+	uint32_t hashes[b3_mixingRuleCount];
+	uint32_t combined = B3_HASH_INIT;
+	for ( int rule = 0; rule < b3_mixingRuleCount; ++rule )
+	{
+		hashes[rule] = RunMixingRuleScene( workerCount, (b3MixingRule)rule );
+		combined = b3Hash( combined, (const uint8_t*)( hashes + rule ), sizeof( uint32_t ) );
+
+		if ( hashes[rule] != goldens[rule] )
+		{
+			printf( "  mixing rule %d workers=%d hash=0x%08X\n", rule, workerCount, hashes[rule] );
+		}
+	}
+
+	for ( int rule = 0; rule < b3_mixingRuleCount; ++rule )
+	{
+		ENSURE_GOLDEN( hashes[rule] == goldens[rule] );
+
+		for ( int other = 0; other < rule; ++other )
+		{
+			ENSURE( hashes[other] != hashes[rule] );
+		}
+	}
+
+	ENSURE( EnsureRepeatable( reference, (DeterminismResult){ .sleepStep = MIXING_RULE_STEP_COUNT, .hash = combined } ) == 0 );
+	return 0;
+}
+
+// Test determinism of every friction and restitution mixing rule. Every shape has its own
+// material and the ground mesh cycles four materials, so each rule produces a distinct simulation.
+static int MixingRuleTest( void )
+{
+	DeterminismResult reference = { 0 };
+	for ( int workerCount = 1; workerCount <= 4; ++workerCount )
+	{
+		int result = SingleMixingRuleTest( workerCount, &reference );
+		ENSURE( result == 0 );
+	}
+
+	return 0;
+}
+
 typedef int SceneFcn( int workerCount, DeterminismResult* reference );
 
 static int RunSceneAtWidth( SceneFcn* scene, int width, DeterminismResult* result )
@@ -571,6 +712,7 @@ static int SIMDWidthTest( void )
 
 	SceneFcn* scenes[] = {
 		SingleMultithreadingTest, SingleWavePileTest, SingleQuerySpawnTest, SingleMeshDropTest, SingleRollingMixTest, SingleMeshMixTest,
+		SingleMixingRuleTest,
 	};
 
 	for ( int i = 0; i < ARRAY_COUNT( scenes ); ++i )
@@ -600,6 +742,7 @@ int DeterminismTest( void )
 	RUN_SUBTEST( WavePileTest );
 	RUN_SUBTEST( QuerySpawnTest );
 	RUN_SUBTEST( MeshDropTest );
+	RUN_SUBTEST( MixingRuleTest );
 	RUN_SUBTEST( SIMDWidthTest );
 
 	return 0;

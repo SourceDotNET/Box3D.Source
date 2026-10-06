@@ -48,17 +48,28 @@ typedef struct b3DebugShape b3DebugShape;
 typedef void* b3CreateDebugShapeCallback( const b3DebugShape* debugShape, void* userContext );
 typedef void b3DestroyDebugShapeCallback( void* userShape, void* userContext );
 
-/// Optional friction mixing callback. This intentionally provides no context objects because this is called
-/// from a worker thread.
-/// @warning This function should not attempt to modify Box3D state or user application state.
+/// Rule used to combine the friction or restitution of two surface materials in contact.
 /// @ingroup world
-typedef float b3FrictionCallback( float frictionA, uint64_t userMaterialIdA, float frictionB, uint64_t userMaterialIdB );
+typedef enum b3MixingRule
+{
+	/// sqrt(a * b)
+	b3_mixGeometricMean,
 
-/// Optional restitution mixing callback. This intentionally provides no context objects because this is called
-/// from a worker thread.
-/// @warning This function should not attempt to modify Box3D state or user application state.
-/// @ingroup world
-typedef float b3RestitutionCallback( float restitutionA, uint64_t userMaterialIdA, float restitutionB, uint64_t userMaterialIdB );
+	/// (a + b) / 2
+	b3_mixAverage,
+
+	/// min(a, b)
+	b3_mixMinimum,
+
+	/// max(a, b)
+	b3_mixMaximum,
+
+	/// a * b
+	b3_mixMultiply,
+
+	/// number of mixing rules
+	b3_mixingRuleCount,
+} b3MixingRule;
 
 /// Prototype for a contact filter callback.
 /// This is called when a contact pair is considered for collision. This allows you to
@@ -173,11 +184,11 @@ typedef struct b3WorldDef
 	/// Maximum linear speed. Usually meters per second.
 	float maximumLinearSpeed;
 
-	/// Optional mixing callback for friction. The default uses sqrt(frictionA * frictionB).
-	b3FrictionCallback* frictionCallback;
+	/// Friction mixing rule. The default is b3_mixGeometricMean, sqrt(frictionA * frictionB).
+	b3MixingRule frictionMixingRule;
 
-	/// Optional mixing callback for restitution. The default uses max(restitutionA, restitutionB).
-	b3RestitutionCallback* restitutionCallback;
+	/// Restitution mixing rule. The default is b3_mixMaximum, max(restitutionA, restitutionB).
+	b3MixingRule restitutionMixingRule;
 
 	/// Can bodies go to sleep to improve performance
 	bool enableSleep;

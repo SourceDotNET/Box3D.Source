@@ -241,12 +241,6 @@ B3_API void b3World_SetUserData( b3WorldId worldId, void* userData );
 /// Get the user data pointer.
 B3_API void* b3World_GetUserData( b3WorldId worldId );
 
-/// Set the friction callback. Passing NULL resets to default.
-B3_API void b3World_SetFrictionCallback( b3WorldId worldId, b3FrictionCallback* callback );
-
-/// Set the restitution callback. Passing NULL resets to default.
-B3_API void b3World_SetRestitutionCallback( b3WorldId worldId, b3RestitutionCallback* callback );
-
 /// Set the worker count. Must be in the range [1, B3_MAX_WORKERS]
 B3_API void b3World_SetWorkerCount( b3WorldId worldId, int count );
 

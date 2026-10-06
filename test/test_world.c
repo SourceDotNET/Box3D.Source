@@ -3,6 +3,7 @@
 
 #include "benchmarks.h"
 #include "body.h"
+#include "contact.h"
 #include "dynamic_tree.h"
 #include "overflow_color.h"
 #include "physics_world.h"
@@ -629,37 +630,16 @@ enum
 	kProbeMaterialId = 999,
 };
 
-// No context pointer on mixing callbacks, so capture through file scope
-static struct
+static b3Contact* GetContact( b3ContactId contactId )
 {
-	int callCount;
-	bool sawChild0;
-	bool sawChild1;
-	float mixedFriction;
-} materialCapture;
-
-static float CaptureFrictionMix( float frictionA, uint64_t userMaterialIdA, float frictionB, uint64_t userMaterialIdB )
-{
-	materialCapture.callCount += 1;
-
-	if ( userMaterialIdA == kChild0MaterialId || userMaterialIdB == kChild0MaterialId )
-	{
-		materialCapture.sawChild0 = true;
-	}
-
-	if ( userMaterialIdA == kChild1MaterialId || userMaterialIdB == kChild1MaterialId )
-	{
-		materialCapture.sawChild1 = true;
-		materialCapture.mixedFriction = sqrtf( frictionA * frictionB );
-	}
-
-	return sqrtf( frictionA * frictionB );
+	b3World* world = b3GetWorld( contactId.world0 );
+	return b3Array_Get( world->contacts, contactId.index1 - 1 );
 }
 
 // Contact material selection must use the struck compound child's material, not entry 0
 // of the compound material table. Child 0 gets low friction, child 1 high friction, and a
-// unit friction sphere strikes only child 1, so the mixing callback must see child 1's
-// values. Covers sphere, capsule, and hull children. Issue #69.
+// unit friction sphere strikes only child 1, so the mixed contact friction must come from
+// child 1's material. Covers sphere, capsule, and hull children. Issue #69.
 static int TestCompoundContactMaterials( void )
 {
 	b3SurfaceMaterial mat0 = b3DefaultSurfaceMaterial();
@@ -710,10 +690,7 @@ static int TestCompoundContactMaterials( void )
 		b3CompoundData* compound = b3CreateCompound( &compoundDef );
 		ENSURE( compound != NULL );
 
-		memset( &materialCapture, 0, sizeof( materialCapture ) );
-
 		b3WorldDef worldDef = b3DefaultWorldDef();
-		worldDef.frictionCallback = CaptureFrictionMix;
 		b3WorldId worldId = b3CreateWorld( &worldDef );
 
 		b3BodyDef bodyDef = b3DefaultBodyDef();
@@ -736,22 +713,89 @@ static int TestCompoundContactMaterials( void )
 		b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
 		b3CreateSphereShape( sphereBodyId, &sphereShapeDef, &sphere );
 
+		int contactSteps = 0;
+		float mixedFriction = 0.0f;
 		for ( int i = 0; i < 30; ++i )
 		{
 			b3World_Step( worldId, 1.0f / 60.0f, 4 );
+
+			b3ContactData contactData;
+			if ( b3Body_GetContactData( sphereBodyId, &contactData, 1 ) == 1 )
+			{
+				contactSteps += 1;
+				mixedFriction = GetContact( contactData.contactId )->friction;
+			}
 		}
 
 		b3DestroyWorld( worldId );
 		b3DestroyCompound( compound );
 
-		ENSURE( materialCapture.callCount > 0 );
-		// The pre-fix code fed material table entry 0 to the mixing callback for every child
-		ENSURE( materialCapture.sawChild0 == false );
-		ENSURE( materialCapture.sawChild1 == true );
+		ENSURE( contactSteps > 0 );
 		// sqrt(0.81 * 1.0)
-		ENSURE_SMALL( materialCapture.mixedFriction - 0.9f, 1e-5f );
+		ENSURE_SMALL( mixedFriction - 0.9f, 1e-5f );
 	}
 
+	return 0;
+}
+
+// Every mixing rule applied to friction and restitution, through both the convex contact
+// path (hull ground) and the mesh contact path (mesh ground).
+static int TestMixingRules( void )
+{
+	float expectedFriction[b3_mixingRuleCount] = { 0.4f, 0.445f, 0.25f, 0.64f, 0.16f };
+	float expectedRestitution[b3_mixingRuleCount] = { 0.4f, 0.5f, 0.2f, 0.8f, 0.16f };
+
+	b3BoxHull box = b3MakeBoxHull( 5.0f, 0.5f, 5.0f );
+	b3MeshData* mesh = b3CreateBoxMesh( b3Vec3_zero, (b3Vec3){ 5.0f, 0.5f, 5.0f }, false );
+	ENSURE( mesh != NULL );
+
+	for ( int groundType = 0; groundType < 2; ++groundType )
+	{
+		for ( int rule = 0; rule < b3_mixingRuleCount; ++rule )
+		{
+			b3WorldDef worldDef = b3DefaultWorldDef();
+			worldDef.frictionMixingRule = (b3MixingRule)rule;
+			worldDef.restitutionMixingRule = (b3MixingRule)rule;
+			b3WorldId worldId = b3CreateWorld( &worldDef );
+
+			b3BodyDef bodyDef = b3DefaultBodyDef();
+			bodyDef.position = (b3Pos){ 0.0f, -0.5f, 0.0f };
+			b3BodyId groundId = b3CreateBody( worldId, &bodyDef );
+			b3ShapeDef groundShapeDef = b3DefaultShapeDef();
+			groundShapeDef.baseMaterial.friction = 0.25f;
+			groundShapeDef.baseMaterial.restitution = 0.2f;
+			if ( groundType == 0 )
+			{
+				b3CreateHullShape( groundId, &groundShapeDef, &box.base );
+			}
+			else
+			{
+				b3CreateMeshShape( groundId, &groundShapeDef, mesh, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
+			}
+
+			bodyDef = b3DefaultBodyDef();
+			bodyDef.type = b3_dynamicBody;
+			bodyDef.position = (b3Pos){ 0.0f, 0.5f, 0.0f };
+			b3BodyId sphereBodyId = b3CreateBody( worldId, &bodyDef );
+			b3ShapeDef sphereShapeDef = b3DefaultShapeDef();
+			sphereShapeDef.baseMaterial.friction = 0.64f;
+			sphereShapeDef.baseMaterial.restitution = 0.8f;
+			b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
+			b3CreateSphereShape( sphereBodyId, &sphereShapeDef, &sphere );
+
+			b3World_Step( worldId, 1.0f / 60.0f, 4 );
+
+			b3ContactData contactData;
+			ENSURE( b3Body_GetContactData( sphereBodyId, &contactData, 1 ) == 1 );
+			b3Contact* contact = GetContact( contactData.contactId );
+			ENSURE_SMALL( contact->friction - expectedFriction[rule], 1e-5f );
+			ENSURE_SMALL( contact->restitution - expectedRestitution[rule], 1e-5f );
+
+			b3DestroyWorld( worldId );
+		}
+	}
+
+	b3DestroyMesh( mesh );
 	return 0;
 }
 
@@ -1635,6 +1679,7 @@ int WorldTest( void )
 	RUN_SUBTEST( TestHitEvents );
 	RUN_SUBTEST( TestCompoundHitEvents );
 	RUN_SUBTEST( TestCompoundContactMaterials );
+	RUN_SUBTEST( TestMixingRules );
 	RUN_SUBTEST( TestOverflowColorPile );
 	RUN_SUBTEST( SetBulletDriftTest );
 	RUN_SUBTEST( EnableSleepFlagSyncTest );

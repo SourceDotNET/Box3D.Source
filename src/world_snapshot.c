@@ -33,7 +33,7 @@
 
 // Snapshot image magic 'BNS3' and version
 #define B3_SNAP_MAGIC 0x33534E42u
-#define B3_SNAP_VERSION 10u // post solve restitution
+#define B3_SNAP_VERSION 11u // friction and restitution mixing rules
 
 #define B3_SNAP_FLAG_VALIDATION 0x1u
 #define B3_SNAP_FLAG_DOUBLE_PRECISION 0x2u
@@ -476,6 +476,8 @@ static void b3SerWorldConfig( b3RecBuffer* buf, const b3World* world )
 	b3SnapW_Bytes( buf, &world->contactHertz, sizeof( float ) );
 	b3SnapW_Bytes( buf, &world->contactDampingRatio, sizeof( float ) );
 	b3SnapW_Bytes( buf, &world->contactRecycleDistance, sizeof( float ) );
+	b3SnapW_I32( buf, (int)world->frictionMixingRule );
+	b3SnapW_I32( buf, (int)world->restitutionMixingRule );
 	b3SnapW_Bytes( buf, &world->stepIndex, sizeof( uint64_t ) );
 	b3SnapW_I32( buf, world->splitIslandId );
 	b3SnapW_Bytes( buf, &world->inv_h, sizeof( float ) );
@@ -503,6 +505,8 @@ static void b3DesWorldConfig( b3SnapReader* r, b3World* world )
 	b3SnapR_Bytes( r, &world->contactHertz, sizeof( float ) );
 	b3SnapR_Bytes( r, &world->contactDampingRatio, sizeof( float ) );
 	b3SnapR_Bytes( r, &world->contactRecycleDistance, sizeof( float ) );
+	world->frictionMixingRule = (b3MixingRule)b3SnapR_I32( r );
+	world->restitutionMixingRule = (b3MixingRule)b3SnapR_I32( r );
 	b3SnapR_Bytes( r, &world->stepIndex, sizeof( uint64_t ) );
 	world->splitIslandId = b3SnapR_I32( r );
 	b3SnapR_Bytes( r, &world->inv_h, sizeof( float ) );

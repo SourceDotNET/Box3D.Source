@@ -776,27 +776,17 @@ Restitution is stored as part of the shape's base surface material:
 shapeDef.baseMaterial.restitution = 0.3f;
 ```
 
-### Friction and Restitution Callbacks
+### Friction and Restitution Mixing
 
-Advanced users can override friction and restitution mixing using `b3FrictionCallback`
-and `b3RestitutionCallback`. These should be very lightweight functions because they
-are called frequently. The callbacks receive the two friction (or restitution) values
-and the user material ids from each shape's surface material.
+The friction and restitution of two touching shapes are combined using a `b3MixingRule`.
+By default friction uses the geometric mean, `sqrt(frictionA * frictionB)`, and restitution
+uses the maximum, `max(restitutionA, restitutionB)`. The available rules are geometric mean,
+average, minimum, maximum, and multiply.
 
 ```c
-float MyFrictionCallback(float frictionA, uint64_t userMaterialIdA,
-                         float frictionB, uint64_t userMaterialIdB)
-{
-    if (userMaterialIdA > userMaterialIdB)
-    {
-        return frictionA;
-    }
-
-    return frictionB;
-}
-
 b3WorldDef worldDef = b3DefaultWorldDef();
-worldDef.frictionCallback = MyFrictionCallback;
+worldDef.frictionMixingRule = b3_mixAverage;
+worldDef.restitutionMixingRule = b3_mixMinimum;
 ```
 
 ### Filtering {#filtering}

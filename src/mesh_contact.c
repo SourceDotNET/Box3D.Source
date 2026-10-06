@@ -1262,10 +1262,8 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 
 				materialIndex = b3ClampInt( materialIndex, 0, shapeA->materialCount - 1 );
 				b3SurfaceMaterial material = materialsA[materialIndex];
-				friction += world->frictionCallback( material.friction, material.userMaterialId, materialB->friction,
-													 materialB->userMaterialId );
-				restitution += world->restitutionCallback( material.restitution, material.userMaterialId, materialB->restitution,
-														   materialB->userMaterialId );
+				friction += b3MixMaterialValue( world->frictionMixingRule, material.friction, materialB->friction );
+				restitution += b3MixMaterialValue( world->restitutionMixingRule, material.restitution, materialB->restitution );
 
 				tangentVelocityA = b3Add( tangentVelocityA, material.tangentVelocity );
 
@@ -1287,10 +1285,8 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 	else
 	{
 		// Keep these updated in case the values on the shapes are modified
-		contact->friction = world->frictionCallback( materialsA[0].friction, materialsA[0].userMaterialId, materialB->friction,
-													 materialB->userMaterialId );
-		contact->restitution = world->restitutionCallback( materialsA[0].restitution, materialsA[0].userMaterialId,
-														   materialB->restitution, materialB->userMaterialId );
+		contact->friction = b3MixMaterialValue( world->frictionMixingRule, materialsA[0].friction, materialB->friction );
+		contact->restitution = b3MixMaterialValue( world->restitutionMixingRule, materialsA[0].restitution, materialB->restitution );
 		tangentVelocityA = materialsA[0].tangentVelocity;
 	}
 

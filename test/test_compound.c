@@ -5,6 +5,8 @@
 
 // b3CollideMoverAndCompound, b3GetCompoundChild, b3QueryCompound are internal
 #include "compound.h"
+#include "contact.h"
+#include "physics_world.h"
 
 #include "box3d/box3d.h"
 #include "box3d/collision.h"
@@ -838,25 +840,10 @@ static b3MeshData* MakeFlatMaterial5Mesh( void )
 	return b3CreateMesh( &def, NULL, 0 );
 }
 
-static uint64_t s_compoundContactMaterialId;
-
-static float CompoundContactFrictionCallback( float frictionA, uint64_t userMaterialIdA, float frictionB,
-											  uint64_t userMaterialIdB )
-{
-	if ( userMaterialIdA == 6 || userMaterialIdB == 6 )
-	{
-		s_compoundContactMaterialId = 6;
-	}
-	return 0.5f * ( frictionA + frictionB );
-}
-
 static int CompoundMeshContactMaterial( void )
 {
-	s_compoundContactMaterialId = 0;
-
 	b3WorldDef worldDef = b3DefaultWorldDef();
 	b3WorldId worldId = b3CreateWorld( &worldDef );
-	b3World_SetFrictionCallback( worldId, CompoundContactFrictionCallback );
 
 	b3BodyDef groundBodyDef = b3DefaultBodyDef();
 	groundBodyDef.type = b3_staticBody;
@@ -868,7 +855,7 @@ static int CompoundMeshContactMaterial( void )
 	b3SurfaceMaterial meshMats[6];
 	for ( int i = 0; i < 6; ++i )
 	{
-		meshMats[i] = MakeMaterial( 0.5f, (uint64_t)( i + 1 ) );
+		meshMats[i] = MakeMaterial( i == 5 ? 0.64f : 0.04f, (uint64_t)( i + 1 ) );
 	}
 
 	b3CompoundMeshDef meshChild = {
@@ -891,6 +878,7 @@ static int CompoundMeshContactMaterial( void )
 	b3BodyId sphereBodyId = b3CreateBody( worldId, &sphereBodyDef );
 	b3ShapeDef sphereShapeDef = b3DefaultShapeDef();
 	sphereShapeDef.density = 1.0f;
+	sphereShapeDef.baseMaterial.friction = 1.0f;
 	b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
 	b3CreateSphereShape( sphereBodyId, &sphereShapeDef, &sphere );
 
@@ -899,7 +887,11 @@ static int CompoundMeshContactMaterial( void )
 		b3World_Step( worldId, 1.0f / 60.0f, 4 );
 	}
 
-	ENSURE( s_compoundContactMaterialId == 6 );
+	b3ContactData contactData;
+	ENSURE( b3Body_GetContactData( sphereBodyId, &contactData, 1 ) == 1 );
+	b3World* world = b3GetWorld( contactData.contactId.world0 );
+	b3Contact* contact = b3Array_Get( world->contacts, contactData.contactId.index1 - 1 );
+	ENSURE_SMALL( contact->friction - 0.8f, 1e-5f );
 
 	b3DestroyWorld( worldId );
 	b3DestroyCompound( compound );
