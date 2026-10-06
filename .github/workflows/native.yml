@@ -1,0 +1,162 @@
+name: native
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  OPTIONS: -DBOX3D_SAMPLES=OFF -DBOX3D_BENCHMARKS=OFF -DBOX3D_DOCS=OFF -DBOX3D_PROFILE=OFF
+
+jobs:
+  build:
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            cmake: -A x64
+            lib: box3d.dll
+          - rid: win-arm64
+            os: windows-11-arm
+            cmake: -A ARM64
+            lib: box3d.dll
+          - rid: osx-x64
+            os: macos-15-intel
+            cmake: -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            lib: libbox3d.dylib
+          - rid: osx-arm64
+            os: macos-latest
+            cmake: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            lib: libbox3d.dylib
+          - rid: linux-x64
+            os: ubuntu-latest
+            zig: x86_64-linux-gnu.2.17
+            lib: libbox3d.so
+          - rid: linux-arm64
+            os: ubuntu-24.04-arm
+            zig: aarch64-linux-gnu.2.17
+            lib: libbox3d.so
+          - rid: linux-musl-x64
+            os: ubuntu-latest
+            alpine: true
+            lib: libbox3d.so
+          - rid: linux-musl-arm64
+            os: ubuntu-24.04-arm
+            alpine: true
+            lib: libbox3d.so
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup zig
+        if: ${{ matrix.zig }}
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Zig toolchain
+        if: ${{ matrix.zig }}
+        shell: bash
+        run: |
+          dir="$RUNNER_TEMP/zig"
+          mkdir -p "$dir"
+          printf '#!/bin/sh\nexec zig cc -target %s "$@"\n' "${{ matrix.zig }}" > "$dir/cc"
+          printf '#!/bin/sh\nexec zig c++ -target %s "$@"\n' "${{ matrix.zig }}" > "$dir/c++"
+          printf '#!/bin/sh\nexec zig ar "$@"\n' > "$dir/ar"
+          printf '#!/bin/sh\nexec zig ranlib "$@"\n' > "$dir/ranlib"
+          chmod +x "$dir"/*
+          echo "TOOLCHAIN=-DCMAKE_C_COMPILER=$dir/cc -DCMAKE_CXX_COMPILER=$dir/c++ -DCMAKE_AR=$dir/ar -DCMAKE_RANLIB=$dir/ranlib -DCMAKE_SHARED_LINKER_FLAGS=-lpthread -DCMAKE_EXE_LINKER_FLAGS=-lpthread" >> "$GITHUB_ENV"
+
+      - name: Build library
+        if: ${{ !matrix.alpine }}
+        shell: bash
+        run: |
+          cmake -S . -B build ${{ matrix.cmake }} $TOOLCHAIN -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBOX3D_UNIT_TESTS=OFF -DBOX3D_VALIDATE=OFF $OPTIONS
+          cmake --build build --config Release --parallel
+
+      - name: Build tests
+        if: ${{ !matrix.alpine }}
+        shell: bash
+        run: |
+          cmake -S . -B build-test ${{ matrix.cmake }} $TOOLCHAIN -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBOX3D_UNIT_TESTS=ON $OPTIONS
+          cmake --build build-test --config Release --target test --parallel
+
+      - name: Test
+        if: ${{ !matrix.alpine }}
+        shell: bash
+        run: |
+          if [ -f build-test/bin/Release/test.exe ]; then
+            build-test/bin/Release/test.exe
+          else
+            build-test/bin/test
+          fi
+
+      - name: Check glibc baseline
+        if: ${{ matrix.zig }}
+        shell: bash
+        run: |
+          readelf -d build/bin/libbox3d.so | grep NEEDED
+          max=$(objdump -T build/bin/libbox3d.so | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV | tail -n 1)
+          echo "highest GLIBC symbol version: $max"
+          test "$(printf '%s\n2.17\n' "$max" | sort -V | tail -n 1)" = "2.17"
+
+      - name: Build and test on Alpine
+        if: ${{ matrix.alpine }}
+        shell: bash
+        run: |
+          docker run --rm -e OPTIONS -v "$PWD:/src" -w /src alpine:3.20 sh -euc '
+            apk add --no-cache build-base cmake linux-headers
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBOX3D_UNIT_TESTS=OFF -DBOX3D_VALIDATE=OFF $OPTIONS
+            cmake --build build --config Release --parallel
+            cmake -S . -B build-test -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBOX3D_UNIT_TESTS=ON $OPTIONS
+            cmake --build build-test --config Release --target test --parallel
+            build-test/bin/test
+            readelf -d build/bin/libbox3d.so | grep NEEDED
+          '
+
+      - name: Collect
+        shell: bash
+        run: |
+          mkdir -p out
+          file=$(find build -name '${{ matrix.lib }}' | head -n 1)
+          test -n "$file"
+          cp -L "$file" out/${{ matrix.lib }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: box3d-${{ matrix.rid }}
+          path: out/${{ matrix.lib }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+
+      - name: Package
+        shell: bash
+        run: |
+          cd dist
+          for dir in box3d-*/; do
+            name="${dir%/}"
+            (cd "$name" && zip -q "../$name.zip" *)
+          done
+          sha256sum *.zip > SHA256SUMS
+
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --title "$GITHUB_REF_NAME" \
+            --notes "Native box3d libraries built from $GITHUB_SHA" dist/*.zip dist/SHA256SUMS
