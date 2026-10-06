@@ -106,6 +106,14 @@ jobs:
           echo "highest GLIBC symbol version: $max"
           test "$(printf '%s\n2.17\n' "$max" | sort -V | tail -n 1)" = "2.17"
 
+      - name: Strip
+        if: ${{ matrix.zig }}
+        shell: bash
+        run: |
+          lib=$(readlink -f build/bin/libbox3d.so)
+          strip --strip-unneeded "$lib"
+          ls -l "$lib"
+
       - name: Build and test on Alpine
         if: ${{ matrix.alpine }}
         shell: bash
