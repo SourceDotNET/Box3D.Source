@@ -741,59 +741,91 @@ static int TestCompoundContactMaterials( void )
 
 // Every mixing rule applied to friction and restitution, through both the convex contact
 // path (hull ground) and the mesh contact path (mesh ground).
+typedef struct MixingCase
+{
+	b3MixingRule rule;
+	float groundFriction;
+	float groundRestitution;
+	float expectedFriction;
+	float expectedRestitution;
+} MixingCase;
+
+static int CheckMixingCase( const MixingCase* mixingCase, const b3HullData* hull, const b3MeshData* mesh )
+{
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	worldDef.frictionMixingRule = mixingCase->rule;
+	worldDef.restitutionMixingRule = mixingCase->rule;
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+
+	b3BodyDef bodyDef = b3DefaultBodyDef();
+	bodyDef.position = (b3Pos){ 0.0f, -0.5f, 0.0f };
+	b3BodyId groundId = b3CreateBody( worldId, &bodyDef );
+	b3ShapeDef groundShapeDef = b3DefaultShapeDef();
+	groundShapeDef.baseMaterial.friction = mixingCase->groundFriction;
+	groundShapeDef.baseMaterial.restitution = mixingCase->groundRestitution;
+	if ( hull != NULL )
+	{
+		b3CreateHullShape( groundId, &groundShapeDef, hull );
+	}
+	else
+	{
+		b3CreateMeshShape( groundId, &groundShapeDef, mesh, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
+	}
+
+	bodyDef = b3DefaultBodyDef();
+	bodyDef.type = b3_dynamicBody;
+	bodyDef.position = (b3Pos){ 0.0f, 0.5f, 0.0f };
+	b3BodyId sphereBodyId = b3CreateBody( worldId, &bodyDef );
+	b3ShapeDef sphereShapeDef = b3DefaultShapeDef();
+	sphereShapeDef.baseMaterial.friction = 0.64f;
+	sphereShapeDef.baseMaterial.restitution = 0.8f;
+	b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
+	b3CreateSphereShape( sphereBodyId, &sphereShapeDef, &sphere );
+
+	b3World_Step( worldId, 1.0f / 60.0f, 4 );
+
+	b3ContactData contactData;
+	ENSURE( b3Body_GetContactData( sphereBodyId, &contactData, 1 ) == 1 );
+	b3Contact* contact = GetContact( contactData.contactId );
+	ENSURE_SMALL( contact->friction - mixingCase->expectedFriction, 1e-5f );
+	ENSURE_SMALL( contact->restitution - mixingCase->expectedRestitution, 1e-5f );
+
+	b3DestroyWorld( worldId );
+	return 0;
+}
+
 static int TestMixingRules( void )
 {
-	float expectedFriction[b3_mixingRuleCount] = { 0.4f, 0.445f, 0.25f, 0.64f, 0.16f };
-	float expectedRestitution[b3_mixingRuleCount] = { 0.4f, 0.5f, 0.2f, 0.8f, 0.16f };
+	MixingCase cases[] = {
+		{ b3_mixGeometricMean, 0.25f, 0.2f, 0.4f, 0.4f },
+		{ b3_mixAverage, 0.25f, 0.2f, 0.445f, 0.5f },
+		{ b3_mixMinimum, 0.25f, 0.2f, 0.25f, 0.2f },
+		{ b3_mixMaximum, 0.25f, 0.2f, 0.64f, 0.8f },
+		{ b3_mixMultiply, 0.25f, 0.2f, 0.16f, 0.16f },
+		{ b3_mixMultiplyClamp, 0.25f, 0.2f, 0.16f, 0.16f },
+		{ b3_mixMultiply, 2.0f, 1.5f, 1.28f, 1.2f },
+		{ b3_mixMultiplyClamp, 2.0f, 1.5f, 1.0f, 1.0f },
+	};
+
+	bool covered[b3_mixingRuleCount] = { 0 };
+	for ( int i = 0; i < ARRAY_COUNT( cases ); ++i )
+	{
+		covered[cases[i].rule] = true;
+	}
+
+	for ( int rule = 0; rule < b3_mixingRuleCount; ++rule )
+	{
+		ENSURE( covered[rule] );
+	}
 
 	b3BoxHull box = b3MakeBoxHull( 5.0f, 0.5f, 5.0f );
 	b3MeshData* mesh = b3CreateBoxMesh( b3Vec3_zero, (b3Vec3){ 5.0f, 0.5f, 5.0f }, false );
 	ENSURE( mesh != NULL );
 
-	for ( int groundType = 0; groundType < 2; ++groundType )
+	for ( int i = 0; i < ARRAY_COUNT( cases ); ++i )
 	{
-		for ( int rule = 0; rule < b3_mixingRuleCount; ++rule )
-		{
-			b3WorldDef worldDef = b3DefaultWorldDef();
-			worldDef.frictionMixingRule = (b3MixingRule)rule;
-			worldDef.restitutionMixingRule = (b3MixingRule)rule;
-			b3WorldId worldId = b3CreateWorld( &worldDef );
-
-			b3BodyDef bodyDef = b3DefaultBodyDef();
-			bodyDef.position = (b3Pos){ 0.0f, -0.5f, 0.0f };
-			b3BodyId groundId = b3CreateBody( worldId, &bodyDef );
-			b3ShapeDef groundShapeDef = b3DefaultShapeDef();
-			groundShapeDef.baseMaterial.friction = 0.25f;
-			groundShapeDef.baseMaterial.restitution = 0.2f;
-			if ( groundType == 0 )
-			{
-				b3CreateHullShape( groundId, &groundShapeDef, &box.base );
-			}
-			else
-			{
-				b3CreateMeshShape( groundId, &groundShapeDef, mesh, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
-			}
-
-			bodyDef = b3DefaultBodyDef();
-			bodyDef.type = b3_dynamicBody;
-			bodyDef.position = (b3Pos){ 0.0f, 0.5f, 0.0f };
-			b3BodyId sphereBodyId = b3CreateBody( worldId, &bodyDef );
-			b3ShapeDef sphereShapeDef = b3DefaultShapeDef();
-			sphereShapeDef.baseMaterial.friction = 0.64f;
-			sphereShapeDef.baseMaterial.restitution = 0.8f;
-			b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
-			b3CreateSphereShape( sphereBodyId, &sphereShapeDef, &sphere );
-
-			b3World_Step( worldId, 1.0f / 60.0f, 4 );
-
-			b3ContactData contactData;
-			ENSURE( b3Body_GetContactData( sphereBodyId, &contactData, 1 ) == 1 );
-			b3Contact* contact = GetContact( contactData.contactId );
-			ENSURE_SMALL( contact->friction - expectedFriction[rule], 1e-5f );
-			ENSURE_SMALL( contact->restitution - expectedRestitution[rule], 1e-5f );
-
-			b3DestroyWorld( worldId );
-		}
+		ENSURE( CheckMixingCase( cases + i, &box.base, NULL ) == 0 );
+		ENSURE( CheckMixingCase( cases + i, NULL, mesh ) == 0 );
 	}
 
 	b3DestroyMesh( mesh );

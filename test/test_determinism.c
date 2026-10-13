@@ -29,7 +29,7 @@
 #define QUERY_SPAWN_QUERY_HASH 0x5B4429DC
 #define MESH_DROP_SLEEP_STEP 218
 #define MESH_DROP_HASH 0x26F9A566
-#define MIXING_RULE_HASHES { 0x12245174, 0x384E0B23, 0xDB98A06A, 0x6038B0F3, 0xBBC19655 }
+#define MIXING_RULE_HASHES { 0x785CFCE1, 0xFAF9BE45, 0x9481DC6A, 0xACE66521, 0x5BB03BB3, 0xC5CBFF76 }
 #else
 #define RAGDOLL_SLEEP_STEP 267
 #define RAGDOLL_HASH 0x9BCA269D
@@ -41,7 +41,7 @@
 #define QUERY_SPAWN_QUERY_HASH 0xE3271F3D
 #define MESH_DROP_SLEEP_STEP 218
 #define MESH_DROP_HASH 0x0A23CFA2
-#define MIXING_RULE_HASHES { 0x3ECC3914, 0x00AF06B6, 0x4709587F, 0x5D50C55A, 0xF9D0FF2A }
+#define MIXING_RULE_HASHES { 0x53ACE251, 0x82E5D5EE, 0xB5E57943, 0x57AB33D0, 0x9141E3FB, 0xCB068100 }
 #endif
 
 #define MIXING_RULE_STEP_COUNT 150
@@ -564,8 +564,8 @@ static uint32_t RunMixingRuleScene( int workerCount, b3MixingRule rule )
 	for ( int i = 0; i < 4; ++i )
 	{
 		groundMaterials[i] = b3DefaultSurfaceMaterial();
-		groundMaterials[i].friction = 0.1f + 0.25f * (float)i;
-		groundMaterials[i].restitution = 0.2f * (float)i;
+		groundMaterials[i].friction = 0.1f + 0.5f * (float)i;
+		groundMaterials[i].restitution = 0.4f * (float)i;
 	}
 
 	b3MeshData* mesh = b3CreateGridMesh( 16, 16, 1.0f, 4, true );

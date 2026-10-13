@@ -67,6 +67,9 @@ typedef enum b3MixingRule
 	/// a * b
 	b3_mixMultiply,
 
+	/// clamp(a * b, 0, 1)
+	b3_mixMultiplyClamp,
+
 	/// number of mixing rules
 	b3_mixingRuleCount,
 } b3MixingRule;

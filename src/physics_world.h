@@ -372,6 +372,8 @@ static inline float b3MixMaterialValue( b3MixingRule rule, float a, float b )
 			return b3MaxFloat( a, b );
 		case b3_mixMultiply:
 			return a * b;
+		case b3_mixMultiplyClamp:
+			return b3ClampFloat( a * b, 0.0f, 1.0f );
 		default:
 			return sqrtf( a * b );
 	}
