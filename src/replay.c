@@ -1104,6 +1104,11 @@ static void b3RecDispatch_ShapeSetMeshMaterial( const b3RecArgs_ShapeSetMeshMate
 	b3Shape_SetMeshMaterial( b3RecMakeShapeId( rdr, a->shape ), a->material, a->index );
 }
 
+static void b3RecDispatch_ShapeSetHullMaterial( const b3RecArgs_ShapeSetHullMaterial* a, b3RecReader* rdr )
+{
+	b3Shape_SetHullMaterial( b3RecMakeShapeId( rdr, a->shape ), a->material, a->faceIndex );
+}
+
 static void b3RecDispatch_ShapeSetFilter( const b3RecArgs_ShapeSetFilter* a, b3RecReader* rdr )
 {
 	b3Shape_SetFilter( b3RecMakeShapeId( rdr, a->shape ), a->filter, a->invokeContacts );

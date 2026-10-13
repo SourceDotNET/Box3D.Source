@@ -832,6 +832,171 @@ static int TestMixingRules( void )
 	return 0;
 }
 
+static int FacingFace( const b3HullData* hull, b3Vec3 direction )
+{
+	const b3Plane* planes = b3GetHullPlanes( hull );
+	int bestFace = 0;
+	for ( int i = 1; i < hull->faceCount; ++i )
+	{
+		if ( b3Dot( planes[i].normal, direction ) > b3Dot( planes[bestFace].normal, direction ) )
+		{
+			bestFace = i;
+		}
+	}
+
+	return bestFace;
+}
+
+static b3BodyId CreateSphereBody( b3WorldId worldId, b3Pos position, b3Vec3 velocity, bool hitEvents )
+{
+	b3BodyDef bodyDef = b3DefaultBodyDef();
+	bodyDef.type = b3_dynamicBody;
+	bodyDef.position = position;
+	bodyDef.linearVelocity = velocity;
+	b3BodyId bodyId = b3CreateBody( worldId, &bodyDef );
+
+	b3ShapeDef shapeDef = b3DefaultShapeDef();
+	shapeDef.baseMaterial.friction = 1.0f;
+	shapeDef.enableHitEvents = hitEvents;
+	b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
+	b3CreateSphereShape( bodyId, &shapeDef, &sphere );
+	return bodyId;
+}
+
+static int TestHullFaceMaterials( void )
+{
+	b3BoxHull box = b3MakeBoxHull( 2.0f, 0.5f, 2.0f );
+	int topFace = FacingFace( &box.base, (b3Vec3){ 0.0f, 1.0f, 0.0f } );
+	int sideFace = FacingFace( &box.base, (b3Vec3){ 1.0f, 0.0f, 0.0f } );
+	ENSURE( topFace != sideFace );
+
+	b3WorldDef worldDef = b3DefaultWorldDef();
+	worldDef.gravity = b3Vec3_zero;
+	b3WorldId worldId = b3CreateWorld( &worldDef );
+
+	b3BodyDef groundDef = b3DefaultBodyDef();
+	b3BodyId groundId = b3CreateBody( worldId, &groundDef );
+	b3ShapeDef groundShapeDef = b3DefaultShapeDef();
+	groundShapeDef.baseMaterial.friction = 0.09f;
+	groundShapeDef.baseMaterial.userMaterialId = 1;
+	groundShapeDef.enableHitEvents = true;
+	b3ShapeId groundShapeId = b3CreateHullShape( groundId, &groundShapeDef, &box.base );
+
+	ENSURE( b3Shape_GetMeshMaterialCount( groundShapeId ) == 1 );
+	ENSURE( b3Shape_GetHullMaterial( groundShapeId, topFace ).userMaterialId == 1 );
+
+	b3SurfaceMaterial top = b3DefaultSurfaceMaterial();
+	top.friction = 0.81f;
+	top.restitution = 0.5f;
+	top.userMaterialId = 7;
+	b3Shape_SetHullMaterial( groundShapeId, top, topFace );
+
+	ENSURE( b3Shape_GetMeshMaterialCount( groundShapeId ) == box.base.faceCount );
+	ENSURE( b3Shape_GetHullMaterial( groundShapeId, topFace ).userMaterialId == 7 );
+	ENSURE( b3Shape_GetHullMaterial( groundShapeId, sideFace ).userMaterialId == 1 );
+
+	b3BodyId topBodyId = CreateSphereBody( worldId, (b3Pos){ 0.0f, 1.0f, 0.0f }, b3Vec3_zero, false );
+	b3BodyId sideBodyId = CreateSphereBody( worldId, (b3Pos){ 2.5f, 0.0f, 0.0f }, b3Vec3_zero, false );
+	CreateSphereBody( worldId, (b3Pos){ 1.5f, 2.0f, 1.5f }, (b3Vec3){ 0.0f, -20.0f, 0.0f }, true );
+
+	bool topHit = false;
+	for ( int i = 0; i < 10; ++i )
+	{
+		b3World_Step( worldId, 1.0f / 60.0f, 4 );
+
+		b3ContactEvents events = b3World_GetContactEvents( worldId );
+		for ( int j = 0; j < events.hitCount; ++j )
+		{
+			b3ContactHitEvent* event = events.hitEvents + j;
+			if ( B3_ID_EQUALS( event->shapeIdA, groundShapeId ) )
+			{
+				topHit = topHit || event->userMaterialIdA == 7;
+			}
+			else if ( B3_ID_EQUALS( event->shapeIdB, groundShapeId ) )
+			{
+				topHit = topHit || event->userMaterialIdB == 7;
+			}
+		}
+
+		if ( i == 0 )
+		{
+			b3ContactData contactData;
+			ENSURE( b3Body_GetContactData( topBodyId, &contactData, 1 ) == 1 );
+			b3Contact* contact = GetContact( contactData.contactId );
+			ENSURE_SMALL( contact->friction - 0.9f, 1e-5f );
+			ENSURE_SMALL( contact->restitution - 0.5f, 1e-5f );
+
+			ENSURE( b3Body_GetContactData( sideBodyId, &contactData, 1 ) == 1 );
+			contact = GetContact( contactData.contactId );
+			ENSURE_SMALL( contact->friction - 0.3f, 1e-5f );
+			ENSURE_SMALL( contact->restitution, 1e-5f );
+		}
+	}
+
+	ENSURE( topHit );
+
+	b3QueryFilter filter = b3DefaultQueryFilter();
+	b3RayResult down = b3World_CastRayClosest( worldId, (b3Pos){ 1.0f, 5.0f, -1.0f }, (b3Vec3){ 0.0f, -10.0f, 0.0f }, filter );
+	ENSURE( down.hit && B3_ID_EQUALS( down.shapeId, groundShapeId ) );
+	ENSURE( down.userMaterialId == 7 );
+
+	b3RayResult side = b3World_CastRayClosest( worldId, (b3Pos){ 5.0f, 0.0f, 1.0f }, (b3Vec3){ -10.0f, 0.0f, 0.0f }, filter );
+	ENSURE( side.hit && B3_ID_EQUALS( side.shapeId, groundShapeId ) );
+	ENSURE( side.userMaterialId == 1 );
+
+	b3HullData* cylinder = b3CreateCylinder( 1.0f, 1.0f, 0.0f, 8 );
+	ENSURE( cylinder != NULL && cylinder->faceCount != box.base.faceCount );
+	b3Shape_SetHull( groundShapeId, cylinder );
+	ENSURE( b3Shape_GetMeshMaterialCount( groundShapeId ) == 1 );
+
+	b3DestroyWorld( worldId );
+	b3DestroyHull( cylinder );
+
+	// Face materials from the shape definition, and the mesh contact path with the hull as shape B.
+	worldDef = b3DefaultWorldDef();
+	worldId = b3CreateWorld( &worldDef );
+
+	b3MeshData* mesh = b3CreateBoxMesh( (b3Vec3){ 0.0f, -0.5f, 0.0f }, (b3Vec3){ 5.0f, 0.5f, 5.0f }, false );
+	ENSURE( mesh != NULL );
+	groundId = b3CreateBody( worldId, &groundDef );
+	b3ShapeDef meshShapeDef = b3DefaultShapeDef();
+	meshShapeDef.baseMaterial.friction = 1.0f;
+	b3CreateMeshShape( groundId, &meshShapeDef, mesh, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
+
+	b3BoxHull cube = b3MakeBoxHull( 0.5f, 0.5f, 0.5f );
+	int bottomFace = FacingFace( &cube.base, (b3Vec3){ 0.0f, -1.0f, 0.0f } );
+	b3SurfaceMaterial cubeMaterials[6];
+	ENSURE( cube.base.faceCount == 6 );
+	for ( int i = 0; i < 6; ++i )
+	{
+		cubeMaterials[i] = b3DefaultSurfaceMaterial();
+		cubeMaterials[i].friction = 0.04f;
+	}
+
+	cubeMaterials[bottomFace].friction = 0.64f;
+	cubeMaterials[bottomFace].userMaterialId = 9;
+
+	b3BodyDef cubeDef = b3DefaultBodyDef();
+	cubeDef.type = b3_dynamicBody;
+	cubeDef.position = (b3Pos){ 0.0f, 0.5f, 0.0f };
+	b3BodyId cubeId = b3CreateBody( worldId, &cubeDef );
+	b3ShapeDef cubeShapeDef = b3DefaultShapeDef();
+	cubeShapeDef.materials = cubeMaterials;
+	cubeShapeDef.materialCount = 6;
+	b3ShapeId cubeShapeId = b3CreateHullShape( cubeId, &cubeShapeDef, &cube.base );
+	ENSURE( b3Shape_GetHullMaterial( cubeShapeId, bottomFace ).userMaterialId == 9 );
+
+	b3World_Step( worldId, 1.0f / 60.0f, 4 );
+
+	b3ContactData contactData;
+	ENSURE( b3Body_GetContactData( cubeId, &contactData, 1 ) == 1 );
+	ENSURE_SMALL( GetContact( contactData.contactId )->friction - 0.8f, 1e-5f );
+
+	b3DestroyWorld( worldId );
+	b3DestroyMesh( mesh );
+	return 0;
+}
+
 static int TestSetWorkerCount( void )
 {
 	b3WorldDef worldDef = b3DefaultWorldDef();
@@ -1881,6 +2046,7 @@ int WorldTest( void )
 	RUN_SUBTEST( TestCompoundHitEvents );
 	RUN_SUBTEST( TestCompoundContactMaterials );
 	RUN_SUBTEST( TestMixingRules );
+	RUN_SUBTEST( TestHullFaceMaterials );
 	RUN_SUBTEST( TestOverflowColorPile );
 	RUN_SUBTEST( SetBulletDriftTest );
 	RUN_SUBTEST( EnableSleepFlagSyncTest );

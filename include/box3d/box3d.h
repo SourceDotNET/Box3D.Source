@@ -939,6 +939,13 @@ B3_API void b3Shape_SetMeshMaterial( b3ShapeId shapeId, b3SurfaceMaterial surfac
 /// Get a surface material for a mesh shape
 B3_API b3SurfaceMaterial b3Shape_GetMeshSurfaceMaterial( b3ShapeId shapeId, int index );
 
+/// Set the surface material of one face of a hull shape. The first call gives every face its own copy of the
+/// shape material, so the other faces keep their current values.
+B3_API void b3Shape_SetHullMaterial( b3ShapeId shapeId, b3SurfaceMaterial surfaceMaterial, int faceIndex );
+
+/// Get the surface material of one face of a hull shape.
+B3_API b3SurfaceMaterial b3Shape_GetHullMaterial( b3ShapeId shapeId, int faceIndex );
+
 /// Get the shape filter
 B3_API b3Filter b3Shape_GetFilter( b3ShapeId shapeId );
 

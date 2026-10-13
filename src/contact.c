@@ -644,8 +644,9 @@ static bool b3UpdateConvexContact( b3World* world, int workerIndex, b3Contact* c
 		}
 	}
 
-	const b3SurfaceMaterial* materialA = b3GetShapeMaterials( shapeA );
-	const b3SurfaceMaterial* materialB = b3GetShapeMaterials( shapeB );
+	b3Vec3 contactNormal = contact->manifolds[0].normal;
+	const b3SurfaceMaterial* materialA = b3GetShapeMaterialFacing( shapeA, xfA.q, contactNormal );
+	const b3SurfaceMaterial* materialB = b3GetShapeMaterialFacing( shapeB, xfB.q, b3Neg( contactNormal ) );
 
 	// Keep these updated in case the values on the shapes are modified
 	contact->friction = b3MixMaterialValue( world->frictionMixingRule, materialA->friction, materialB->friction );

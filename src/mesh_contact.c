@@ -1219,7 +1219,10 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 
 	const b3SurfaceMaterial* materialsA = b3GetShapeMaterials( shapeA );
 	const b3SurfaceMaterial* materialB = b3GetShapeMaterials( shapeB );
+	bool faceMaterialsB = b3HasHullFaceMaterials( shapeB );
 	b3Vec3 tangentVelocityA = b3Vec3_zero;
+	b3Vec3 localTangentVelocityB = materialB->tangentVelocity;
+	float rollingResistanceB = materialB->rollingResistance;
 
 	// Update friction and restitution if the mesh has per triangle material
 	if ( shapeA->materialCount > 0 )
@@ -1227,6 +1230,8 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 		float friction = 0.0f;
 		float restitution = 0.0f;
 		float sampleCount = 0.0f;
+		b3Vec3 tangentVelocitySumB = b3Vec3_zero;
+		float rollingResistanceSumB = 0.0f;
 
 		const uint8_t* materialIndices;
 		if ( shapeA->type == b3_meshShape )
@@ -1242,6 +1247,8 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 		{
 			b3Manifold* manifold = contact->manifolds + i;
 			int pointCount = manifold->pointCount;
+			const b3SurfaceMaterial* manifoldMaterialB =
+				faceMaterialsB ? b3GetShapeMaterialFacing( shapeB, xfB.q, b3Neg( manifold->normal ) ) : materialB;
 			for ( int j = 0; j < pointCount; ++j )
 			{
 				int triangleIndex = manifold->points[j].triangleIndex;
@@ -1262,10 +1269,13 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 
 				materialIndex = b3ClampInt( materialIndex, 0, shapeA->materialCount - 1 );
 				b3SurfaceMaterial material = materialsA[materialIndex];
-				friction += b3MixMaterialValue( world->frictionMixingRule, material.friction, materialB->friction );
-				restitution += b3MixMaterialValue( world->restitutionMixingRule, material.restitution, materialB->restitution );
+				friction += b3MixMaterialValue( world->frictionMixingRule, material.friction, manifoldMaterialB->friction );
+				restitution +=
+					b3MixMaterialValue( world->restitutionMixingRule, material.restitution, manifoldMaterialB->restitution );
 
 				tangentVelocityA = b3Add( tangentVelocityA, material.tangentVelocity );
+				tangentVelocitySumB = b3Add( tangentVelocitySumB, manifoldMaterialB->tangentVelocity );
+				rollingResistanceSumB += manifoldMaterialB->rollingResistance;
 
 				sampleCount += 1.0f;
 			}
@@ -1277,6 +1287,12 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 			contact->friction = invCount * friction;
 			contact->restitution = invCount * restitution;
 			tangentVelocityA = b3MulSV( invCount, tangentVelocityA );
+
+			if ( faceMaterialsB )
+			{
+				localTangentVelocityB = b3MulSV( invCount, tangentVelocitySumB );
+				rollingResistanceB = invCount * rollingResistanceSumB;
+			}
 		}
 
 		B3_ASSERT( b3IsValidFloat( contact->friction ) && contact->friction >= 0.0f );
@@ -1306,9 +1322,9 @@ bool b3ComputeMeshManifolds( b3World* world, int workerIndex, b3Contact* contact
 		radiusB = shapeB->hull->innerRadius;
 	}
 
-	contact->rollingResistance = materialB->rollingResistance * radiusB;
+	contact->rollingResistance = rollingResistanceB * radiusB;
 
-	b3Vec3 tangentVelocityB = b3RotateVector( xfB.q, materialB->tangentVelocity );
+	b3Vec3 tangentVelocityB = b3RotateVector( xfB.q, localTangentVelocityB );
 	contact->tangentVelocity = b3Sub( tangentVelocityA, tangentVelocityB );
 	return true;
 }

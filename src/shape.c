@@ -199,6 +199,8 @@ static b3Shape* b3CreateShapeInternal( b3World* world, b3Body* body, b3WorldTran
 	}
 	else if ( def->materialCount > 1 && def->materials != NULL )
 	{
+		B3_ASSERT( shape->type != b3_hullShape || def->materialCount == shape->hull->faceCount );
+
 		// Per triangle materials need a heap array.
 		shape->materialCount = def->materialCount;
 		shape->materials = b3Alloc( def->materialCount * sizeof( b3SurfaceMaterial ) );
@@ -869,6 +871,10 @@ b3CastOutput b3RayCastShape( const b3Shape* shape, b3Transform transform, const 
 			break;
 		case b3_hullShape:
 			output = b3RayCastHull( shape->hull, &localInput );
+			if ( b3HasHullFaceMaterials( shape ) )
+			{
+				output.materialIndex = b3FindHullFace( shape->hull, output.normal );
+			}
 			break;
 		case b3_meshShape:
 			output = b3RayCastMesh( &shape->mesh, &localInput );
@@ -916,6 +922,10 @@ b3CastOutput b3ShapeCastShape( const b3Shape* shape, b3Transform transform, cons
 
 		case b3_hullShape:
 			output = b3ShapeCastHull( shape->hull, &localInput );
+			if ( b3HasHullFaceMaterials( shape ) )
+			{
+				output.materialIndex = b3FindHullFace( shape->hull, output.normal );
+			}
 			break;
 
 		case b3_meshShape:
@@ -993,6 +1003,13 @@ int b3CollideMover( b3PlaneResult* planes, int planeCapacity, const b3Shape* sha
 
 		case b3_hullShape:
 			planeCount = b3CollideMoverAndHull( planes, shape->hull, &localMover );
+			if ( b3HasHullFaceMaterials( shape ) )
+			{
+				for ( int i = 0; i < planeCount; ++i )
+				{
+					planes[i].materialIndex = b3FindHullFace( shape->hull, planes[i].plane.normal );
+				}
+			}
 			break;
 
 		case b3_meshShape:
@@ -1342,6 +1359,52 @@ b3SurfaceMaterial b3Shape_GetMeshSurfaceMaterial( b3ShapeId shapeId, int index )
 	return b3GetShapeMaterials( shape )[index];
 }
 
+void b3Shape_SetHullMaterial( b3ShapeId shapeId, b3SurfaceMaterial surfaceMaterial, int faceIndex )
+{
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.friction ) && surfaceMaterial.friction >= 0.0f );
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.restitution ) && surfaceMaterial.restitution >= 0.0f );
+	B3_ASSERT( b3IsValidFloat( surfaceMaterial.rollingResistance ) && surfaceMaterial.rollingResistance >= 0.0f );
+	B3_ASSERT( b3IsValidVec3( surfaceMaterial.tangentVelocity ) );
+
+	b3World* world = b3GetWorld( shapeId.world0 );
+	b3Shape* shape = b3GetShape( world, shapeId );
+
+	B3_ASSERT( shape->type == b3_hullShape );
+	B3_ASSERT( 0 <= faceIndex && faceIndex < shape->hull->faceCount );
+
+	B3_REC( world, ShapeSetHullMaterial, shapeId, surfaceMaterial, faceIndex );
+
+	if ( shape->materials == NULL )
+	{
+		int faceCount = shape->hull->faceCount;
+		shape->materials = b3Alloc( faceCount * sizeof( b3SurfaceMaterial ) );
+		for ( int i = 0; i < faceCount; ++i )
+		{
+			shape->materials[i] = shape->material;
+		}
+
+		shape->materialCount = faceCount;
+	}
+
+	shape->materials[faceIndex] = surfaceMaterial;
+}
+
+b3SurfaceMaterial b3Shape_GetHullMaterial( b3ShapeId shapeId, int faceIndex )
+{
+	b3World* world = b3GetWorld( shapeId.world0 );
+	b3Shape* shape = b3GetShape( world, shapeId );
+
+	B3_ASSERT( shape->type == b3_hullShape );
+	B3_ASSERT( 0 <= faceIndex && faceIndex < shape->hull->faceCount );
+
+	if ( shape->materials == NULL )
+	{
+		return shape->material;
+	}
+
+	return shape->materials[b3MinInt( faceIndex, shape->materialCount - 1 )];
+}
+
 b3Filter b3Shape_GetFilter( b3ShapeId shapeId )
 {
 	b3World* world = b3GetWorld( shapeId.world0 );
@@ -1671,6 +1734,14 @@ void b3Shape_SetHull( b3ShapeId shapeId, const b3HullData* hull )
 	shape->hull = data;
 	shape->type = b3_hullShape;
 	shape->aabbMargin = b3ComputeShapeMargin( shape );
+
+	if ( shape->materials != NULL && shape->materialCount != data->faceCount )
+	{
+		shape->material = shape->materials[0];
+		b3Free( shape->materials, shape->materialCount * sizeof( b3SurfaceMaterial ) );
+		shape->materials = NULL;
+		shape->materialCount = 1;
+	}
 
 	// need to wake bodies so they can react to the shape change
 	bool wakeBodies = true;

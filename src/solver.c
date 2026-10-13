@@ -2148,8 +2148,14 @@ void b3Solve( b3World* world, b3StepContext* stepContext )
 
 						// shapeB is never a compound today (asserted in b3CreateContact), so the
 						// childIndex argument is irrelevant for it. shapeA carries the compound.
-						event.userMaterialIdA = b3GetShapeUserMaterialId( shapeA, contact->childIndex, triangleIndex );
-						event.userMaterialIdB = b3GetShapeUserMaterialId( shapeB, 0, triangleIndex );
+						event.userMaterialIdA =
+							b3HasHullFaceMaterials( shapeA )
+								? b3GetShapeMaterialFacing( shapeA, simA->transform.q, event.normal )->userMaterialId
+								: b3GetShapeUserMaterialId( shapeA, contact->childIndex, triangleIndex );
+						event.userMaterialIdB =
+							b3HasHullFaceMaterials( shapeB )
+								? b3GetShapeMaterialFacing( shapeB, simB->transform.q, b3Neg( event.normal ) )->userMaterialId
+								: b3GetShapeUserMaterialId( shapeB, 0, triangleIndex );
 
 						b3Array_Push( world->contactHitEvents, event );
 					}

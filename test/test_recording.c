@@ -1336,6 +1336,7 @@ static int AllOps( void )
 	b3Shape_SetHull( boxShapeId, &swapHull.base );
 	b3Shape_SetMesh( meshShapeId, swapMeshData, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
 	b3Shape_SetMeshMaterial( meshShapeId, surfMat, 0 );
+	b3Shape_SetHullMaterial( boxShapeId, surfMat, 0 );
 
 	// Body mutators: SetTransform, SetLinearVelocity/AngularVelocity (Vec3), SetName,
 	// damping, gravity scale, sleep threshold, SetAwake, EnableSleep, SetBullet, SetMotionLocks,

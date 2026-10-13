@@ -74,6 +74,41 @@ static inline b3SurfaceMaterial* b3GetShapeMaterials( const b3Shape* shape )
 	return shape->materials != NULL ? shape->materials : (b3SurfaceMaterial*)&shape->material;
 }
 
+static inline bool b3HasHullFaceMaterials( const b3Shape* shape )
+{
+	return shape->type == b3_hullShape && shape->materials != NULL;
+}
+
+static inline int b3FindHullFace( const b3HullData* hull, b3Vec3 localDirection )
+{
+	const b3Plane* planes = b3GetHullPlanes( hull );
+	int bestFace = 0;
+	float bestDot = b3Dot( planes[0].normal, localDirection );
+	for ( int i = 1; i < hull->faceCount; ++i )
+	{
+		float dot = b3Dot( planes[i].normal, localDirection );
+		if ( dot > bestDot )
+		{
+			bestDot = dot;
+			bestFace = i;
+		}
+	}
+
+	return bestFace;
+}
+
+static inline const b3SurfaceMaterial* b3GetShapeMaterialFacing( const b3Shape* shape, b3Quat rotation, b3Vec3 direction )
+{
+	const b3SurfaceMaterial* materials = b3GetShapeMaterials( shape );
+	if ( b3HasHullFaceMaterials( shape ) == false )
+	{
+		return materials;
+	}
+
+	int face = b3FindHullFace( shape->hull, b3InvRotateVector( rotation, direction ) );
+	return materials + b3MinInt( face, shape->materialCount - 1 );
+}
+
 void b3CreateShapeProxy( b3World* world, b3Shape* shape, b3BodyType type, b3WorldTransform transform, bool forcePairCreation );
 void b3DestroyShapeProxy( b3Shape* shape, b3BroadPhase* bp );
 
