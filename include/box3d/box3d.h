@@ -47,6 +47,8 @@ B3_API int b3GetMaxWorldCount( void );
 B3_API bool b3World_IsValid( b3WorldId id );
 
 /// Simulate a world for one time step. This performs collision detection, integration, and constraint solution.
+/// A time step of zero runs the broad-phase and collision, but skips the solver. So you can still get contact
+/// and sensor events.
 /// @param worldId The world to simulate
 /// @param timeStep The amount of time to simulate, this should be a fixed number. Usually 1/60.
 /// @param subStepCount The number of sub-steps, increasing the sub-step count can increase accuracy. Usually 4.
@@ -994,6 +996,9 @@ B3_API b3Mesh b3Shape_GetMesh( b3ShapeId shapeId );
 
 /// Get the shape's height field. Asserts the type is correct.
 B3_API const b3HeightFieldData* b3Shape_GetHeightField( b3ShapeId shapeId );
+
+/// Get the shape's compound. Asserts the type is correct.
+B3_API const b3CompoundData* b3Shape_GetCompound( b3ShapeId shapeId );
 
 /// Allows you to change a shape to be a sphere or update the current sphere.
 /// This does not modify the mass properties.
