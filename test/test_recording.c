@@ -76,8 +76,9 @@ static int HullDedup( void )
 {
 	// Build a small convex hull
 	b3Vec3 pts[8] = {
-		{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f }, { -1.0f, 1.0f, -1.0f },
-		{ -1.0f, -1.0f, 1.0f },	 { 1.0f, -1.0f, 1.0f },	 { 1.0f, 1.0f, 1.0f },	{ -1.0f, 1.0f, 1.0f },
+		{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f },
+		{ -1.0f, 1.0f, -1.0f },	 { -1.0f, -1.0f, 1.0f }, { 1.0f, -1.0f, 1.0f },
+		{ 1.0f, 1.0f, 1.0f },	 { -1.0f, 1.0f, 1.0f },
 	};
 	b3HullData* hull = b3CreateHull( pts, 8, 8 );
 	ENSURE( hull != NULL );
@@ -127,7 +128,8 @@ static int HullDedup( void )
 
 	// entryCount is a little-endian u32 at the start of the registry block
 	const uint8_t* rp = bytes + (int)regOff;
-	uint32_t entryCount = (uint32_t)rp[0] | ( (uint32_t)rp[1] << 8 ) | ( (uint32_t)rp[2] << 16 ) | ( (uint32_t)rp[3] << 24 );
+	uint32_t entryCount = (uint32_t)rp[0] | ( (uint32_t)rp[1] << 8 ) | ( (uint32_t)rp[2] << 16 ) |
+						  ( (uint32_t)rp[3] << 24 );
 	ENSURE( entryCount == 1 );
 
 	b3DestroyRecording( rec );
@@ -174,7 +176,8 @@ static int CrossWidthReplay( void )
 			for ( int k = 0; k < 3; ++k )
 			{
 				seed = seed * 1664525u + 1013904223u;
-				v[k] = ( (float)( seed >> 8 ) / (float)( 1 << 24 ) - 0.5f ) * ( k == 1 ? 0.6f : 1.0f );
+				v[k] =
+					( (float)( seed >> 8 ) / (float)( 1 << 24 ) - 0.5f ) * ( k == 1 ? 0.6f : 1.0f );
 			}
 			points[i] = (b3Vec3){ v[0], v[1], v[2] };
 		}
@@ -204,8 +207,10 @@ static int CrossWidthReplay( void )
 	{
 		b3BodyDef bodyDef = b3DefaultBodyDef();
 		bodyDef.type = b3_dynamicBody;
-		bodyDef.position = (b3Pos){ 0.4f * (float)( i % 3 ) - 0.4f, 1.5f + 0.9f * (float)i, 0.3f * (float)( i % 2 ) };
-		bodyDef.rotation = b3MakeQuatFromAxisAngle( (b3Vec3){ 0.0f, 1.0f, 0.0f }, 0.37f * (float)i );
+		bodyDef.position = (b3Pos){ 0.4f * (float)( i % 3 ) - 0.4f, 1.5f + 0.9f * (float)i,
+									0.3f * (float)( i % 2 ) };
+		bodyDef.rotation =
+			b3MakeQuatFromAxisAngle( (b3Vec3){ 0.0f, 1.0f, 0.0f }, 0.37f * (float)i );
 		b3BodyId bodyId = b3CreateBody( worldId, &bodyDef );
 		b3CreateHullShape( bodyId, &dynamicShape, hulls[i % hullCount] );
 	}
@@ -452,8 +457,9 @@ static int ScrubBackward( void )
 static int SeekWithHull( void )
 {
 	b3Vec3 pts[8] = {
-		{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f }, { -1.0f, 1.0f, -1.0f },
-		{ -1.0f, -1.0f, 1.0f },	 { 1.0f, -1.0f, 1.0f },	 { 1.0f, 1.0f, 1.0f },	{ -1.0f, 1.0f, 1.0f },
+		{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f },
+		{ -1.0f, 1.0f, -1.0f },	 { -1.0f, -1.0f, 1.0f }, { 1.0f, -1.0f, 1.0f },
+		{ 1.0f, 1.0f, 1.0f },	 { -1.0f, 1.0f, 1.0f },
 	};
 	b3HullData* hull = b3CreateHull( pts, 8, 8 );
 	ENSURE( hull != NULL );
@@ -549,7 +555,8 @@ static void RecTestDestroyDebugShape( void* userShape, void* userContext )
 	counters->destroyed += 1;
 }
 
-static void RecTestDrawShape( void* userShape, b3WorldTransform transform, b3HexColor color, void* context )
+static void RecTestDrawShape( void* userShape, b3WorldTransform transform, b3HexColor color,
+							  void* context )
 {
 	(void)userShape;
 	(void)transform;
@@ -618,12 +625,14 @@ static int DebugShapeCallbacks( void )
 	b3Recording* loaded = b3LoadRecordingFromFile( path );
 	ENSURE( loaded != NULL );
 
-	b3RecPlayer* player = b3CreatePlayer( b3Recording_GetData( loaded ), b3Recording_GetSize( loaded ), 1 );
+	b3RecPlayer* player =
+		b3CreatePlayer( b3Recording_GetData( loaded ), b3Recording_GetSize( loaded ), 1 );
 	ENSURE( player != NULL );
 
 	// Wiring the callbacks rebuilds the world and rewinds to frame 0.
 	DebugShapeCounters counters = { 0, 0 };
-	b3RecPlayer_SetDebugShapeCallbacks( player, RecTestCreateDebugShape, RecTestDestroyDebugShape, &counters );
+	b3RecPlayer_SetDebugShapeCallbacks( player, RecTestCreateDebugShape, RecTestDestroyDebugShape,
+										&counters );
 	ENSURE( b3RecPlayer_GetFrame( player ) == 0 );
 
 	// Replay to the end, then draw: createDebugShape fires once per shape (ground + 4 boxes = 5).
@@ -635,8 +644,8 @@ static int DebugShapeCallbacks( void )
 	ENSURE( counters.created >= 5 );
 	ENSURE( !b3RecPlayer_HasDiverged( player ) );
 
-	// A backward seek restores the empty seed in place, releasing the live debug shapes, then forward
-	// stepping recreates them through the callbacks, so more creates fire.
+	// A backward seek restores the empty seed in place, releasing the live debug shapes, then
+	// forward stepping recreates them through the callbacks, so more creates fire.
 	int createdBefore = counters.created;
 	b3RecPlayer_SeekFrame( player, 0 );
 	b3RecPlayer_SeekFrame( player, totalFrames );
@@ -705,7 +714,8 @@ static int PlayerAccessors( void )
 	b3World_StopRecording( worldId );
 	b3DestroyWorld( worldId );
 
-	b3RecPlayer* player = b3CreatePlayer( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 );
+	b3RecPlayer* player =
+		b3CreatePlayer( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 );
 	ENSURE( player != NULL );
 
 	// Info reflects the recorded tuning and a non-degenerate bounds.
@@ -754,10 +764,11 @@ static int PlayerAccessors( void )
 	return 0;
 }
 
-// A keyframe restore is a deterministic replay state, so shapes that persist must keep their renderer
-// handle rather than being torn down and rebuilt every seek. Record a snapshot-seeded session (shapes
-// exist at frame 0), replay with handle callbacks, scrub backward across keyframes repeatedly, and
-// verify no new handles are built per restore and the create/destroy counts still balance at teardown.
+// A keyframe restore is a deterministic replay state, so shapes that persist must keep their
+// renderer handle rather than being torn down and rebuilt every seek. Record a snapshot-seeded
+// session (shapes exist at frame 0), replay with handle callbacks, scrub backward across keyframes
+// repeatedly, and verify no new handles are built per restore and the create/destroy counts still
+// balance at teardown.
 static int KeyframeHandleReuse( void )
 {
 	b3WorldDef worldDef = b3DefaultWorldDef();
@@ -803,11 +814,13 @@ static int KeyframeHandleReuse( void )
 	b3World_StopRecording( worldId );
 	b3DestroyWorld( worldId );
 
-	b3RecPlayer* player = b3CreatePlayer( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 );
+	b3RecPlayer* player =
+		b3CreatePlayer( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 );
 	ENSURE( player != NULL );
 
 	DebugShapeCounters counters = { 0, 0 };
-	b3RecPlayer_SetDebugShapeCallbacks( player, RecTestCreateDebugShape, RecTestDestroyDebugShape, &counters );
+	b3RecPlayer_SetDebugShapeCallbacks( player, RecTestCreateDebugShape, RecTestDestroyDebugShape,
+										&counters );
 
 	// Replay to the end and draw: one handle per shape.
 	b3RecPlayer_SeekFrame( player, totalFrames );
@@ -815,8 +828,8 @@ static int KeyframeHandleReuse( void )
 	ENSURE( !b3RecPlayer_HasDiverged( player ) );
 	ENSURE( counters.created == shapeCount );
 
-	// Scrub backward and forward across keyframes. Each restore keeps the persistent shapes' handles,
-	// so drawing builds no new ones.
+	// Scrub backward and forward across keyframes. Each restore keeps the persistent shapes'
+	// handles, so drawing builds no new ones.
 	int createdAfterFirstDraw = counters.created;
 	int seekTargets[] = { 40, 70, 20, 60, 8, 75 };
 	for ( int k = 0; k < (int)( sizeof( seekTargets ) / sizeof( seekTargets[0] ) ); ++k )
@@ -841,8 +854,9 @@ static bool QueryReplayOverlapFcn( b3ShapeId shapeId, void* context )
 	return true;
 }
 
-static float QueryReplayCastFcn( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fraction, uint64_t userMaterialId,
-								 int triangleIndex, int childIndex, void* context )
+static float QueryReplayCastFcn( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fraction,
+								 uint64_t userMaterialId, int triangleIndex, int childIndex,
+								 void* context )
 {
 	(void)shapeId;
 	(void)point;
@@ -855,8 +869,9 @@ static float QueryReplayCastFcn( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, 
 	return fraction;
 }
 
-static float CompoundHitCastFcn( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fraction, uint64_t userMaterialId,
-								 int triangleIndex, int childIndex, void* context )
+static float CompoundHitCastFcn( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, float fraction,
+								 uint64_t userMaterialId, int triangleIndex, int childIndex,
+								 void* context )
 {
 	(void)point;
 	(void)normal;
@@ -871,7 +886,8 @@ static float CompoundHitCastFcn( b3ShapeId shapeId, b3Pos point, b3Vec3 normal, 
 	return 1.0f;
 }
 
-static bool QueryReplayPlaneFcn( b3ShapeId shapeId, const b3PlaneResult* planes, int planeCount, void* context )
+static bool QueryReplayPlaneFcn( b3ShapeId shapeId, const b3PlaneResult* planes, int planeCount,
+								 void* context )
 {
 	(void)shapeId;
 	(void)planes;
@@ -887,9 +903,9 @@ static bool QueryReplayMoverFilterFcn( b3ShapeId shapeId, void* context )
 	return true;
 }
 
-// Issue all seven world queries each frame, then replay. Every query is re-issued against the replay
-// world and compared to what was recorded, so a clean (non-diverged) replay proves the queries
-// reproduce. Also opens a player and confirms the per-frame query store surfaces all seven.
+// Issue all seven world queries each frame, then replay. Every query is re-issued against the
+// replay world and compared to what was recorded, so a clean (non-diverged) replay proves the
+// queries reproduce. Also opens a player and confirms the per-frame query store surfaces all seven.
 static int QueryReplay( void )
 {
 	b3Recording* rec = b3CreateRecording( 0 );
@@ -939,7 +955,8 @@ static int QueryReplay( void )
 		b3World_CastRay( worldId, origin, translation, filter, QueryReplayCastFcn, NULL );
 		b3World_CastRayClosest( worldId, origin, translation, filter );
 		b3World_CastShape( worldId, origin, &proxy, translation, filter, QueryReplayCastFcn, NULL );
-		b3World_CastMover( worldId, origin, &mover, translation, filter, QueryReplayMoverFilterFcn, NULL );
+		b3World_CastMover( worldId, origin, &mover, translation, filter, QueryReplayMoverFilterFcn,
+						   NULL );
 		b3World_CollideMover( worldId, origin, &mover, filter, QueryReplayPlaneFcn, NULL );
 
 		b3World_Step( worldId, 1.0f / 60.0f, 4 );
@@ -952,7 +969,8 @@ static int QueryReplay( void )
 	ENSURE( b3ValidateReplay( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 ) );
 
 	// Player path: seek to a mid frame and confirm the per-frame store holds all seven queries.
-	b3RecPlayer* player = b3CreatePlayer( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 );
+	b3RecPlayer* player =
+		b3CreatePlayer( b3Recording_GetData( rec ), b3Recording_GetSize( rec ), 1 );
 	ENSURE( player != NULL );
 
 	b3RecPlayer_SeekFrame( player, 15 );
@@ -980,10 +998,10 @@ static int QueryReplay( void )
 	return 0;
 }
 
-// Tagged queries: the caller (id, label) is hashed into a key that rides the QueryTag op, with the id
-// and label interned in the trailing tag table. The same label under two entity ids is two distinct
-// keys. All survive a file round-trip and resolve back through b3RecQueryInfo; untagged queries report
-// key 0 / id 0 / name NULL.
+// Tagged queries: the caller (id, label) is hashed into a key that rides the QueryTag op, with the
+// id and label interned in the trailing tag table. The same label under two entity ids is two
+// distinct keys. All survive a file round-trip and resolve back through b3RecQueryInfo; untagged
+// queries report key 0 / id 0 / name NULL.
 static int TaggedQuery( void )
 {
 	b3Recording* rec = b3CreateRecording( 0 );
@@ -1042,7 +1060,8 @@ static int TaggedQuery( void )
 	b3Recording* loaded = b3LoadRecordingFromFile( path );
 	ENSURE( loaded != NULL );
 
-	b3RecPlayer* player = b3CreatePlayer( b3Recording_GetData( loaded ), b3Recording_GetSize( loaded ), 1 );
+	b3RecPlayer* player =
+		b3CreatePlayer( b3Recording_GetData( loaded ), b3Recording_GetSize( loaded ), 1 );
 	ENSURE( player != NULL );
 
 	b3RecPlayer_SeekFrame( player, 5 );
@@ -1178,7 +1197,8 @@ static int AllOps( void )
 
 	b3ShapeDef sphereShapeDef = b3DefaultShapeDef();
 	sphereShapeDef.density = 1.0f;
-	// Over-length shape name so replay exercises the clamp in the shape def reader, like the body above.
+	// Over-length shape name so replay exercises the clamp in the shape def reader, like the body
+	// above.
 	sphereShapeDef.name = "sphereNameThatExceedsTheLimit";
 	b3Sphere sphere = { { 0.0f, 0.0f, 0.0f }, 0.5f };
 	b3ShapeId sphereShapeId = b3CreateSphereShape( bodyId, &sphereShapeDef, &sphere );
@@ -1199,8 +1219,9 @@ static int AllOps( void )
 
 	// Custom hull shape on a third dynamic body
 	b3Vec3 hullPts[8] = {
-		{ -0.5f, -0.5f, -0.5f }, { 0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, -0.5f }, { -0.5f, 0.5f, -0.5f },
-		{ -0.5f, -0.5f, 0.5f },	 { 0.5f, -0.5f, 0.5f },	 { 0.5f, 0.5f, 0.5f },	{ -0.5f, 0.5f, 0.5f },
+		{ -0.5f, -0.5f, -0.5f }, { 0.5f, -0.5f, -0.5f }, { 0.5f, 0.5f, -0.5f },
+		{ -0.5f, 0.5f, -0.5f },	 { -0.5f, -0.5f, 0.5f }, { 0.5f, -0.5f, 0.5f },
+		{ 0.5f, 0.5f, 0.5f },	 { -0.5f, 0.5f, 0.5f },
 	};
 	b3HullData* customHull = b3CreateHull( hullPts, 8, 8 );
 	ENSURE( customHull != NULL );
@@ -1237,9 +1258,10 @@ static int AllOps( void )
 	ENSURE( b3Body_IsValid( xformBodyId ) );
 	b3ShapeDef xformShapeDef = b3DefaultShapeDef();
 	xformShapeDef.density = 1.0f;
-	b3Transform xformXf = { (b3Vec3){ 0.1f, 0.2f, -0.1f }, b3MakeQuatFromAxisAngle( (b3Vec3){ 0.0f, 1.0f, 0.0f }, 0.4f ) };
-	b3ShapeId xformShapeId =
-		b3CreateTransformedHullShape( xformBodyId, &xformShapeDef, customHull, xformXf, (b3Vec3){ 1.25f, 0.75f, 1.5f } );
+	b3Transform xformXf = { (b3Vec3){ 0.1f, 0.2f, -0.1f },
+							b3MakeQuatFromAxisAngle( (b3Vec3){ 0.0f, 1.0f, 0.0f }, 0.4f ) };
+	b3ShapeId xformShapeId = b3CreateTransformedHullShape(
+		xformBodyId, &xformShapeDef, customHull, xformXf, (b3Vec3){ 1.25f, 0.75f, 1.5f } );
 	ENSURE( b3Shape_IsValid( xformShapeId ) );
 
 	// Mesh, height field, and compound static shapes (3D-only)
@@ -1252,7 +1274,8 @@ static int AllOps( void )
 	b3MeshData* swapMeshData = b3CreateGridMesh( 4, 4, 1.5f, 0, false );
 	ENSURE( swapMeshData != NULL );
 	b3ShapeDef meshShapeDef = b3DefaultShapeDef();
-	b3ShapeId meshShapeId = b3CreateMeshShape( meshBodyId, &meshShapeDef, meshData, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
+	b3ShapeId meshShapeId =
+		b3CreateMeshShape( meshBodyId, &meshShapeDef, meshData, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
 	ENSURE( b3Shape_IsValid( meshShapeId ) );
 
 	b3BodyDef hfBodyDef = b3DefaultBodyDef();
@@ -1340,8 +1363,8 @@ static int AllOps( void )
 
 	// Body mutators: SetTransform, SetLinearVelocity/AngularVelocity (Vec3), SetName,
 	// damping, gravity scale, sleep threshold, SetAwake, EnableSleep, SetBullet, SetMotionLocks,
-	// SetMassData, ApplyMassFromShapes, SetType, SetTargetTransform, Disable/Enable, EnableContactRecycling,
-	// EnableHitEvents, all force/impulse/torque variants
+	// SetMassData, ApplyMassFromShapes, SetType, SetTargetTransform, Disable/Enable,
+	// EnableContactRecycling, EnableHitEvents, all force/impulse/torque variants
 	b3Body_SetTransform( bodyId, (b3Pos){ 1.0f, 6.0f, 0.0f }, b3Quat_identity );
 	b3Body_SetLinearVelocity( bodyId, (b3Vec3){ 0.5f, 0.0f, 0.0f } );
 	b3Body_SetAngularVelocity( bodyId, (b3Vec3){ 0.0f, 0.25f, 0.0f } );
@@ -1408,7 +1431,8 @@ static int AllOps( void )
 	b3Body_ApplyForce( bodyId, (b3Vec3){ 0.0f, 50.0f, 0.0f }, (b3Pos){ 1.0f, 6.0f, 0.0f }, true );
 	b3Body_ApplyForceToCenter( bodyId, (b3Vec3){ 5.0f, 0.0f, 0.0f }, true );
 	b3Body_ApplyTorque( bodyId, (b3Vec3){ 0.0f, 1.0f, 0.0f }, true );
-	b3Body_ApplyLinearImpulse( bodyId, (b3Vec3){ 0.1f, 0.0f, 0.0f }, (b3Pos){ 1.0f, 6.0f, 0.0f }, true );
+	b3Body_ApplyLinearImpulse( bodyId, (b3Vec3){ 0.1f, 0.0f, 0.0f }, (b3Pos){ 1.0f, 6.0f, 0.0f },
+							   true );
 	b3Body_ApplyLinearImpulseToCenter( bodyId, (b3Vec3){ 0.0f, 0.1f, 0.0f }, true );
 	b3Body_ApplyAngularImpulse( bodyId, (b3Vec3){ 0.0f, 0.05f, 0.0f }, true );
 
@@ -1444,7 +1468,8 @@ static int AllOps( void )
 	b3RevoluteJoint_SetSpringDampingRatio( revId, 0.5f );
 	b3RevoluteJoint_SetTargetAngle( revId, 0.25f );
 	b3Joint_SetLocalFrameA( revId, (b3Transform){ (b3Vec3){ 1.0f, 0.0f, 0.0f }, b3Quat_identity } );
-	b3Joint_SetLocalFrameB( revId, (b3Transform){ (b3Vec3){ -1.0f, 0.0f, 0.0f }, b3Quat_identity } );
+	b3Joint_SetLocalFrameB( revId,
+							(b3Transform){ (b3Vec3){ -1.0f, 0.0f, 0.0f }, b3Quat_identity } );
 	b3Joint_SetConstraintTuning( revId, 60.0f, 2.0f );
 	b3Joint_SetForceThreshold( revId, 100.0f );
 	b3Joint_SetTorqueThreshold( revId, 50.0f );
@@ -1570,6 +1595,46 @@ static int AllOps( void )
 	b3ParallelJoint_SetSpringDampingRatio( parallelId, 0.5f );
 	b3ParallelJoint_SetMaxTorque( parallelId, 20.0f );
 
+	// Dynamic mover: a rotation locked capsule driven by a mover joint and held up by a pogo joint
+	b3BodyDef moverBodyDef = b3DefaultBodyDef();
+	moverBodyDef.type = b3_dynamicBody;
+	moverBodyDef.position = (b3Pos){ -20.0f, 3.0f, 0.0f };
+	moverBodyDef.motionLocks =
+		(b3MotionLocks){ .angularX = true, .angularY = true, .angularZ = true };
+	b3BodyId moverBodyId = b3CreateBody( worldId, &moverBodyDef );
+	b3ShapeDef moverShapeDef = b3DefaultShapeDef();
+	moverShapeDef.density = 1.0f;
+	moverShapeDef.baseMaterial.friction = 0.0f;
+	b3Capsule moverCapsule = { { 0.0f, -0.5f, 0.0f }, { 0.0f, 0.5f, 0.0f }, 0.3f };
+	b3CreateCapsuleShape( moverBodyId, &moverShapeDef, &moverCapsule );
+
+	b3MoverJointDef moverDef = b3DefaultMoverJointDef();
+	moverDef.base.bodyIdA = groundId;
+	moverDef.base.bodyIdB = moverBodyId;
+	moverDef.base.collideConnected = true;
+	moverDef.linearVelocity = (b3Vec3){ 1.0f, 0.0f, 0.5f };
+	moverDef.maxForce = 0.5f;
+	b3JointId moverJointId = b3CreateMoverJoint( worldId, &moverDef );
+
+	b3PogoJointDef pogoDef = b3DefaultPogoJointDef();
+	pogoDef.base.bodyIdA = groundId;
+	pogoDef.base.bodyIdB = moverBodyId;
+	pogoDef.base.localFrameA.p = (b3Vec3){ -20.0f, 1.0f, 0.0f };
+	pogoDef.base.localFrameB.p = moverCapsule.center1;
+	pogoDef.base.collideConnected = true;
+	pogoDef.restLength = 1.0f;
+	pogoDef.hertz = 5.0f;
+	pogoDef.dampingRatio = 0.8f;
+	pogoDef.maxCompressionForce = 1000.0f;
+	pogoDef.maxTensionForce = 1000.0f;
+	b3JointId pogoJointId = b3CreatePogoJoint( worldId, &pogoDef );
+	b3PogoJoint_SetRestLength( pogoJointId, 0.9f );
+	b3PogoJoint_SetSpringHertz( pogoJointId, 4.0f );
+	b3PogoJoint_SetSpringDampingRatio( pogoJointId, 0.7f );
+	b3PogoJoint_SetNormal( pogoJointId, b3Normalize( (b3Vec3){ 0.2f, 1.0f, 0.0f } ) );
+	b3PogoJoint_SetMaxTensionForce( pogoJointId, 800.0f );
+	b3PogoJoint_SetMaxCompressionForce( pogoJointId, 900.0f );
+
 	// World config mutators
 	b3World_SetGravity( worldId, (b3Vec3){ 0.0f, -9.8f, 0.0f } );
 	b3World_EnableSleeping( worldId, true );
@@ -1584,6 +1649,21 @@ static int AllOps( void )
 	b3World_SetContactRecycleDistance( worldId, 0.05f );
 	b3World_SetMaximumLinearSpeed( worldId, 100.0f );
 	b3World_RebuildStaticTree( worldId );
+
+	// The tolerance only reaches bodies whose mass is computed afterwards. A free spinning rod made
+	// after the change loses its gyroscopic torque, so replay diverges if the op goes missing.
+	b3World_SetIsotropicInertiaTolerance( worldId, 1.0f );
+	{
+		b3BodyDef rodDef = b3DefaultBodyDef();
+		rodDef.type = b3_dynamicBody;
+		rodDef.position = (b3Pos){ 40.0f, 10.0f, 0.0f };
+		rodDef.gravityScale = 0.0f;
+		rodDef.angularVelocity = (b3Vec3){ 1.0f, 5.0f, 0.5f };
+		b3BodyId rodId = b3CreateBody( worldId, &rodDef );
+		b3BoxHull rod = b3MakeBoxHull( 0.1f, 1.0f, 0.1f );
+		b3ShapeDef rodShapeDef = b3DefaultShapeDef();
+		b3CreateHullShape( rodId, &rodShapeDef, &rod.base );
+	}
 
 	b3ExplosionDef explosion = b3DefaultExplosionDef();
 	explosion.position = (b3Pos){ 0.0f, 5.0f, 0.0f };
@@ -1605,7 +1685,8 @@ static int AllOps( void )
 	b3World_CastRayClosest( worldId, qorigin, qTranslation, qfilter );
 	b3World_CastShape( worldId, qorigin, &proxy, qTranslation, qfilter, QueryReplayCastFcn, NULL );
 	b3Capsule mover = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 0.3f };
-	b3World_CastMover( worldId, qorigin, &mover, qTranslation, qfilter, QueryReplayMoverFilterFcn, NULL );
+	b3World_CastMover( worldId, qorigin, &mover, qTranslation, qfilter, QueryReplayMoverFilterFcn,
+					   NULL );
 	b3World_CollideMover( worldId, qorigin, &mover, qfilter, QueryReplayPlaneFcn, NULL );
 
 	float timeStep = 1.0f / 60.0f;
@@ -1618,8 +1699,21 @@ static int AllOps( void )
 			b3Body_ApplyLinearImpulseToCenter( capsuleBodyId, (b3Vec3){ 2.0f, 0.0f, 0.0f }, true );
 			b3Body_SetGravityScale( bodyId, 1.0f );
 			b3Body_SetSafetyFactor( fastId, 0.4f );
+			b3MoverJoint_SetMaxVelocityForce( moverJointId, 60.0f );
 		}
 
+		// The dynamic mover rebuilds its pogo every step, warm started from the old one
+		if ( i >= 6 )
+		{
+			pogoDef.impulse = b3PogoJoint_GetImpulse( pogoJointId );
+			pogoDef.velocity = b3PogoJoint_GetCurrentSpeed( pogoJointId );
+			pogoDef.base.localFrameA.p =
+				b3Body_GetLocalPoint( groundId, b3Body_GetPosition( moverBodyId ) );
+			pogoDef.base.localFrameA.p.y = 1.0f;
+			b3DestroyJoint( pogoJointId, false );
+			pogoJointId = b3CreatePogoJoint( worldId, &pogoDef );
+			b3MoverJoint_SetLinearVelocity( moverJointId, (b3Vec3){ -0.5f, 0.0f, 1.0f } );
+		}
 		// Issue queries mid-loop to exercise recording across steps
 		if ( i == 3 )
 		{
@@ -1701,8 +1795,9 @@ static int AllOps( void )
 			ENSURE( b3RecPlayer_GetFrame( player ) == seekTargets[k] );
 
 			bool hitCompound = false;
-			b3World_CastRay( b3RecPlayer_GetWorldId( player ), (b3Pos){ 30.0f, 10.0f, 0.0f }, (b3Vec3){ 0.0f, -20.0f, 0.0f },
-							 b3DefaultQueryFilter(), CompoundHitCastFcn, &hitCompound );
+			b3World_CastRay( b3RecPlayer_GetWorldId( player ), (b3Pos){ 30.0f, 10.0f, 0.0f },
+							 (b3Vec3){ 0.0f, -20.0f, 0.0f }, b3DefaultQueryFilter(),
+							 CompoundHitCastFcn, &hitCompound );
 			ENSURE( hitCompound );
 		}
 		while ( b3RecPlayer_StepFrame( player ) )
@@ -1761,8 +1856,9 @@ static int AllOps( void )
 static int TransformedHullRoundTrip( void )
 {
 	b3Vec3 pts[8] = {
-		{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f }, { -1.0f, 1.0f, -1.0f },
-		{ -1.0f, -1.0f, 1.0f },	 { 1.0f, -1.0f, 1.0f },	 { 1.0f, 1.0f, 1.0f },	{ -1.0f, 1.0f, 1.0f },
+		{ -1.0f, -1.0f, -1.0f }, { 1.0f, -1.0f, -1.0f }, { 1.0f, 1.0f, -1.0f },
+		{ -1.0f, 1.0f, -1.0f },	 { -1.0f, -1.0f, 1.0f }, { 1.0f, -1.0f, 1.0f },
+		{ 1.0f, 1.0f, 1.0f },	 { -1.0f, 1.0f, 1.0f },
 	};
 	b3HullData* hull = b3CreateHull( pts, 8, 8 );
 	ENSURE( hull != NULL );
@@ -1778,8 +1874,10 @@ static int TransformedHullRoundTrip( void )
 	b3ShapeDef shapeDef = b3DefaultShapeDef();
 	shapeDef.density = 1.0f;
 
-	// Baked transform with a rotation and non-uniform scale, the path Unreal uses for instanced hulls.
-	b3Transform xf = { (b3Vec3){ 0.25f, 0.0f, -0.5f }, b3MakeQuatFromAxisAngle( (b3Vec3){ 0.0f, 0.0f, 1.0f }, 0.3f ) };
+	// Baked transform with a rotation and non-uniform scale, the path Unreal uses for instanced
+	// hulls.
+	b3Transform xf = { (b3Vec3){ 0.25f, 0.0f, -0.5f },
+					   b3MakeQuatFromAxisAngle( (b3Vec3){ 0.0f, 0.0f, 1.0f }, 0.3f ) };
 	b3Vec3 scl = { 1.5f, 0.5f, 2.0f };
 	for ( int i = 0; i < 3; ++i )
 	{
@@ -1791,8 +1889,9 @@ static int TransformedHullRoundTrip( void )
 		ENSURE( b3Shape_IsValid( sid ) );
 	}
 
-	// A plain hull after the transformed ones: if the transformed creates desynced the id pool, this
-	// shape's recorded id would not match what replay allocates and b3ValidateReplay would fail.
+	// A plain hull after the transformed ones: if the transformed creates desynced the id pool,
+	// this shape's recorded id would not match what replay allocates and b3ValidateReplay would
+	// fail.
 	{
 		b3BodyDef bodyDef = b3DefaultBodyDef();
 		bodyDef.type = b3_dynamicBody;
@@ -1802,8 +1901,8 @@ static int TransformedHullRoundTrip( void )
 		ENSURE( b3Shape_IsValid( sid ) );
 	}
 
-	// Step past the keyframe interval so replay captures a keyframe. That path re-serializes the live
-	// world and interns the baked hull, which must already be in the pre-seeded registry.
+	// Step past the keyframe interval so replay captures a keyframe. That path re-serializes the
+	// live world and interns the baked hull, which must already be in the pre-seeded registry.
 	for ( int i = 0; i < 20; ++i )
 	{
 		b3World_Step( worldId, 1.0f / 60.0f, 4 );
@@ -1921,7 +2020,8 @@ static int CorruptCompound( void )
 	int recSize = b3Recording_GetSize( rec );
 	ENSURE( b3ValidateReplay( recData, recSize, 1 ) );
 
-	// The registry entry is a kind byte and a 4 byte length, then the blob, which leads with its version
+	// The registry entry is a kind byte and a 4 byte length, then the blob, which leads with its
+	// version
 	uint64_t version = B3_COMPOUND_VERSION;
 	int blobOffset = -1;
 	for ( int i = 5; i + (int)sizeof( version ) <= recSize; ++i )
@@ -1964,9 +2064,10 @@ static int CorruptCompound( void )
 }
 
 // Geometry that shares a content hash but differs in bytes must dedup exactly. Mirrors the keyframe
-// flow that crashed: the seed appends every slot 1:1 (even byte-identical duplicates a hash collision
-// left in an already-recorded file), then capture must resolve a live blob back to an existing slot
-// without growing the registry. Forces the collision by handing the same hash to distinct blobs.
+// flow that crashed: the seed appends every slot 1:1 (even byte-identical duplicates a hash
+// collision left in an already-recorded file), then capture must resolve a live blob back to an
+// existing slot without growing the registry. Forces the collision by handing the same hash to
+// distinct blobs.
 static int GeometryHashCollision( void )
 {
 	enum
@@ -2003,8 +2104,8 @@ static int GeometryHashCollision( void )
 
 	b3FreeRegistry( &reg );
 
-	// Seed-then-capture: appending byte-identical duplicate slots keeps id == slot index, and a later
-	// exact intern still resolves to one of them without appending a new entry.
+	// Seed-then-capture: appending byte-identical duplicate slots keeps id == slot index, and a
+	// later exact intern still resolves to one of them without appending a new entry.
 	b3GeometryRegistry seeded = { 0 };
 	uint8_t slot0[n];
 	uint8_t slot1[n];
@@ -2028,11 +2129,12 @@ static int GeometryHashCollision( void )
 	return 0;
 }
 
-// Staged stepping must reveal a mid-stream body at its creation transform. A body created and given an
-// impulse in one recorded step is first placed by CreateBody, then displaced by the following Step. Atomic
-// replay fuses the two, so the body is only ever seen already moved. Staged replay parks between them so
-// the pre-integration pose is drawable. Verify the parked pose is the creation transform, that atomic
-// replay does not show it, and that the extra park does not perturb the end state.
+// Staged stepping must reveal a mid-stream body at its creation transform. A body created and given
+// an impulse in one recorded step is first placed by CreateBody, then displaced by the following
+// Step. Atomic replay fuses the two, so the body is only ever seen already moved. Staged replay
+// parks between them so the pre-integration pose is drawable. Verify the parked pose is the
+// creation transform, that atomic replay does not show it, and that the extra park does not perturb
+// the end state.
 static int StagedStepCreationPose( void )
 {
 	b3Recording* rec = b3CreateRecording( 0 );
@@ -2054,8 +2156,8 @@ static int StagedStepCreationPose( void )
 		b3World_Step( worldId, timeStep, subStepCount );
 	}
 
-	// The creation transform under test. No ground, so the body is the only create and stays ballistic.
-	// Components are exact in float so the round-trip pose compares tight.
+	// The creation transform under test. No ground, so the body is the only create and stays
+	// ballistic. Components are exact in float so the round-trip pose compares tight.
 	const b3Pos spawn = { 1.0, 20.0, -2.0 };
 	b3BodyDef bodyDef = b3DefaultBodyDef();
 	bodyDef.type = b3_dynamicBody;
@@ -2067,7 +2169,8 @@ static int StagedStepCreationPose( void )
 	shapeDef.density = 1.0f;
 	b3CreateSphereShape( bodyId, &shapeDef, &sphere );
 
-	// Impulse along +x so the first integrated step moves the body a visible distance off the spawn.
+	// Impulse along +x so the first integrated step moves the body a visible distance off the
+	// spawn.
 	b3Body_ApplyLinearImpulseToCenter( bodyId, (b3Vec3){ 5.0f, 0.0f, 0.0f }, true );
 
 	const int creationFrame = leadFrames + 1;
@@ -2106,8 +2209,8 @@ static int StagedStepCreationPose( void )
 	uint64_t atomicHash = b3HashWorldState( b3GetWorldFromId( b3RecPlayer_GetWorldId( atomic ) ) );
 	b3DestroyPlayer( atomic );
 
-	// Staged replay: step forward until the first pre-step park. It must sit at the creation frame's
-	// pre-integration state with the new body at exactly its spawn transform.
+	// Staged replay: step forward until the first pre-step park. It must sit at the creation
+	// frame's pre-integration state with the new body at exactly its spawn transform.
 	b3RecPlayer* staged = b3CreatePlayer( data, sz, 1 );
 	ENSURE( staged != NULL );
 	while ( !b3RecPlayer_IsAtEnd( staged ) )
@@ -2119,7 +2222,8 @@ static int StagedStepCreationPose( void )
 		}
 	}
 	ENSURE( b3RecPlayer_IsAtPreStep( staged ) );
-	ENSURE( b3RecPlayer_GetFrame( staged ) == creationFrame - 1 ); // parked before the step, frame not advanced
+	ENSURE( b3RecPlayer_GetFrame( staged ) ==
+			creationFrame - 1 ); // parked before the step, frame not advanced
 
 	b3BodyId stagedId = b3RecPlayer_GetBodyId( staged, 0 );
 	ENSURE( b3Body_IsValid( stagedId ) );
@@ -2133,7 +2237,8 @@ static int StagedStepCreationPose( void )
 	ENSURE( b3RecPlayer_GetFrame( staged ) == creationFrame );
 	ENSURE( !b3RecPlayer_IsAtPreStep( staged ) );
 
-	// Run staged to the end: the same op stream, so it must land on the atomic end state bit for bit.
+	// Run staged to the end: the same op stream, so it must land on the atomic end state bit for
+	// bit.
 	while ( !b3RecPlayer_IsAtEnd( staged ) )
 	{
 		b3RecPlayer_SubStepFrame( staged );
@@ -2148,9 +2253,9 @@ static int StagedStepCreationPose( void )
 	return 0;
 }
 
-// Shape names are debug only and do not feed the determinism hash, so b3ValidateReplay cannot catch a
-// broken name round-trip. Replay through the player and read the names back to prove the def field and
-// the ShapeSetName op survive serialization.
+// Shape names are debug only and do not feed the determinism hash, so b3ValidateReplay cannot catch
+// a broken name round-trip. Replay through the player and read the names back to prove the def
+// field and the ShapeSetName op survive serialization.
 static int ShapeNameReplay( void )
 {
 	const char* names[3] = {
@@ -2234,8 +2339,9 @@ static int ShapeNameReplay( void )
 // A box sliding across a mesh floor, with the option to swap both geometries and retune a
 // per-triangle material part way through. Returns the final state hash so the caller can prove the
 // mutations move the simulation. Recording is optional so the same scene serves as the control.
-static uint64_t RunGeometryMutatorScene( b3Recording* rec, bool mutate, const b3MeshData* meshA, const b3MeshData* meshB,
-										 const b3HullData* swapHull, float swapFriction )
+static uint64_t RunGeometryMutatorScene( b3Recording* rec, bool mutate, const b3MeshData* meshA,
+										 const b3MeshData* meshB, const b3HullData* swapHull,
+										 float swapFriction )
 {
 	b3WorldDef worldDef = b3DefaultWorldDef();
 	worldDef.workerCount = 1;
@@ -2257,7 +2363,8 @@ static uint64_t RunGeometryMutatorScene( b3Recording* rec, bool mutate, const b3
 	b3ShapeDef meshShapeDef = b3DefaultShapeDef();
 	meshShapeDef.materials = meshMaterials;
 	meshShapeDef.materialCount = 2;
-	b3ShapeId meshShapeId = b3CreateMeshShape( meshBodyId, &meshShapeDef, meshA, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
+	b3ShapeId meshShapeId =
+		b3CreateMeshShape( meshBodyId, &meshShapeDef, meshA, (b3Vec3){ 1.0f, 1.0f, 1.0f } );
 
 	b3BodyDef boxBodyDef = b3DefaultBodyDef();
 	boxBodyDef.type = b3_dynamicBody;
@@ -2320,11 +2427,13 @@ static int GeometryMutatorReplay( void )
 	b3BoxHull swapHull = b3MakeBoxHull( 0.25f, 1.5f, 0.25f );
 	const float swapFriction = 0.95f;
 
-	uint64_t controlHash = RunGeometryMutatorScene( NULL, false, meshA, meshB, &swapHull.base, swapFriction );
+	uint64_t controlHash =
+		RunGeometryMutatorScene( NULL, false, meshA, meshB, &swapHull.base, swapFriction );
 
 	b3Recording* rec = b3CreateRecording( 0 );
 	ENSURE( rec != NULL );
-	uint64_t mutatedHash = RunGeometryMutatorScene( rec, true, meshA, meshB, &swapHull.base, swapFriction );
+	uint64_t mutatedHash =
+		RunGeometryMutatorScene( rec, true, meshA, meshB, &swapHull.base, swapFriction );
 
 	// Without this the replay gate below could pass on a recording that never carried the ops.
 	ENSURE( mutatedHash != controlHash );

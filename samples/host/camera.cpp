@@ -12,7 +12,6 @@ static constexpr float ORBIT_SENS = 0.005f;		 // radians per pixel
 static constexpr float FLY_LOOK_SENS = 0.005f;	 // radians per pixel
 static constexpr float PAN_SENS = 0.005f;		 // meters per pixel per meter of radius
 static constexpr float RADIAL_ZOOM_SENS = 0.02f; // meters per pixel (alt+right-drag)
-static constexpr float FLY_SPEED_STEP = 1.0f;	 // m/s per scroll tick
 static constexpr float ZOOM_STEP = 0.9f;		 // multiplier per scroll tick
 static constexpr float MIN_DIST = 0.1f;
 static constexpr float MIN_SPEED = 0.06f;	 // matches box3d's 0.001*60
@@ -502,7 +501,7 @@ void Camera::Update( float dt, int width, int height )
 
 		if ( m_speedScrollAccum != 0.0f )
 		{
-			m_speed += m_speedScrollAccum * FLY_SPEED_STEP;
+			m_speed *= powf( 1.1f, m_speedScrollAccum );
 			m_speed = b3ClampFloat( m_speed, MIN_SPEED, MAX_SPEED );
 		}
 	}

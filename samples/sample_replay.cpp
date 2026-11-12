@@ -94,6 +94,10 @@ static const char* ReplayJointTypeName( b3JointType type )
 			return "weld";
 		case b3_wheelJoint:
 			return "wheel";
+		case b3_moverJoint:
+			return "mover";
+		case b3_pogoJoint:
+			return "pogo";
 		default:
 			return "?";
 	}

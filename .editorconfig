@@ -1,0 +1,5 @@
+root = true
+
+[*.{c,h,cpp,inl}]
+guidelines = 120
+guidelines_style = 1px dotted gray

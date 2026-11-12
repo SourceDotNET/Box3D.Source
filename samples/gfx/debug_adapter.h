@@ -42,6 +42,7 @@ void SetGroundShape( b3ShapeId shapeId );
 void SetShapeMaterial( b3ShapeId shapeId, Vec4 color, float metallic, float roughness );
 void SetTransparentDynamic( bool enabled );
 void SetTransparentKinematic( bool enabled );
+void SetBodyAlpha( b3BodyId bodyId, float alpha );
 
 // View box for compound child culling, world space. Set once per frame before
 // b3World_Draw. A compound then submits only the children overlapping this box

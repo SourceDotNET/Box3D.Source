@@ -11,6 +11,7 @@
 // Fed from the host event loop; read with the KEY_* aliases in gfx/keycodes.h.
 bool IsKeyDown( int key );
 void SetKeyDown( int key, bool down );
+void ClearKeysDown();
 
 // Key action passed to Keyboard, matching the old GLFW press/release values so
 // sample code reads naturally without leaking sokol_app event types.
@@ -18,6 +19,17 @@ enum
 {
 	ACTION_RELEASE = 0,
 	ACTION_PRESS = 1,
+};
+
+// Character input relative to the camera. Throttle x is forward and y is right.
+struct MoverInput
+{
+	b3Vec3 forward;
+	b3Vec3 right;
+	b3Vec2 throttle;
+	bool jump;
+	bool sprint;
+	bool walk;
 };
 
 struct SampleContext
@@ -84,6 +96,9 @@ struct SampleContext
 
 	// UI visibility (Tab / View > Hide UI). When hidden only the minimal HUD shows.
 	bool showUI = true;
+
+	// Viewport text: HUD, sample text lines and world labels.
+	bool showText = true;
 
 	// Bottom metrics drawer (M), set by Ctrl+O for the fuzzy picker.
 	bool showMetrics = false;
@@ -210,6 +225,9 @@ public:
 	virtual void MouseMove( b3Vec2 p );
 
 	void ToggleThirdPerson();
+
+	// WASD, space, shift and ctrl, active only in third person so the free camera keeps its keys.
+	MoverInput GetMoverInput() const;
 
 	B3_PRINTF_FORMAT( 2, 3 )
 	void DrawTextLine( const char* text, ... );
